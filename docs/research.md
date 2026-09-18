@@ -11,7 +11,7 @@ Each entry has:
 
 - **Key**: the identifier used in `citations.json` and in code (`basis` fields)
 - **Citation**: full reference with DOI
-- **Access**: whether we read the full text or only the abstract
+- **Access**: whether we read the full text, only the abstract, or neither
 - **Finding**: what the paper actually showed, in our words
 - **Rule for IRON**: the concrete thing the engine does because of this paper
 - **Caveats**: limits on how far the finding should be pushed
@@ -21,6 +21,12 @@ When a paper is superseded, keep the entry and add a `Superseded by` line rather
 ## Priority order
 
 Meta-analyses and meta-regressions set defaults. Single trials refine or caveat them. Preprints are cited as preprints. When two papers conflict, the more recent meta-regression wins unless it has a stated limitation that the older paper does not.
+
+## Verify before citing
+
+One entry in an earlier draft of this document was wrong in a way worth guarding against: a finding stated in a paper's *introduction*, citing someone else's work, was attributed to that paper itself. The Journal of Human Kinetics velocity paper was listed as the basis for down-weighting high-rep 1RM estimates, but that finding is Reynolds et al. (2006), which the velocity paper only cites.
+
+So: before an entry's finding is treated as settled, confirm it is that paper's own result and not one it references. Entries marked `access: abstract` are especially exposed to this, because abstracts and introductions both summarize other people's work. Any entry whose access line is not "full text" should be treated as provisional.
 
 ---
 
@@ -53,7 +59,7 @@ Useful anchors from the included studies: median volume for hypertrophy effects 
 
 ### remmert2025
 
-**Citation:** Remmert JF, Pelland JC, Robinson ZP, Hinson SR, Zourdos MC. Is There Too Much of a Good Thing? Meta-Regressions of the Effect of Per-Session Volume on Hypertrophy and Strength. *SportRxiv* preprint. 2025. https://sportrxiv.org/index.php/server/preprint/view/537
+**Citation:** Remmert JF, Pelland JC, Robinson ZP, Hinson SR, Zourdos MC. Meta-Regressions of the Effect of Per-Session Volume on Hypertrophy and Strength. *SportRxiv* preprint. 2025. https://sportrxiv.org/index.php/server/preprint/view/537
 
 **Access:** Abstract
 
@@ -61,19 +67,19 @@ Useful anchors from the included studies: median volume for hypertrophy effects 
 
 **Rule for IRON:** Cap the number of sets suggested for one muscle group in a single session. The specific number requires reading the full preprint.
 
-**Caveats:** Preprint, not yet peer reviewed. Full text not yet read; the cap value is a placeholder until it is.
+**Caveats:** Preprint, not peer reviewed. Full text not yet read; the cap value is a placeholder until it is.
 
 ---
 
 ### schoenfeld2017
 
-**Citation:** Schoenfeld BJ, Ogborn D, Krieger JW. Dose-response relationship between weekly resistance training volume and increases in muscle mass: a systematic review and meta-analysis. *Journal of Sports Science*. 2017;35(11):1073-1082. https://doi.org/10.1080/02640414.2016.1210197
+**Citation:** Schoenfeld BJ, Ogborn D, Krieger JW. Dose-response relationship between weekly resistance training volume and increases in muscle mass: a systematic review and meta-analysis. *Journal of Sports Sciences*. 2017;35(11):1073-1082. https://doi.org/10.1080/02640414.2016.1210197
 
 **Access:** Abstract
 
 **Finding:** Earlier volume meta-analysis. Graded dose-response between weekly sets and hypertrophy; 10+ sets per week produced more growth than fewer, but the authors could not draw conclusions above ~9 sets because of limited data at the time.
 
-**Rule for IRON:** None independently. Superseded by pelland2026.
+**Rule for IRON:** None independently.
 
 **Superseded by:** pelland2026
 
@@ -96,7 +102,7 @@ Data and code: https://osf.io/7knsj/
 - Strength goal: RIR is not the primary lever. Accept 1-4 RIR; drive progression through load.
 - User-facing copy should say closer to failure tends to help growth, not that failure is required.
 
-**Caveats:** Exploratory meta-regression of estimated RIR. Modest model fit by the authors' own assessment. This is the single most important paper for the engine and also the one with the most explicit uncertainty.
+**Caveats:** Exploratory meta-regression of estimated RIR. Modest model fit by the authors' own assessment. This is the single most important paper for the engine and also the one with the most explicit uncertainty. Worth obtaining the full text through RPI's library access before finalizing the RIR targets.
 
 ---
 
@@ -106,7 +112,7 @@ Data and code: https://osf.io/7knsj/
 
 **Access:** Not yet read
 
-**Finding:** Establishes the RIR-based RPE scale that IRON's effort rating is built on.
+**Finding:** Establishes the RIR-based RPE scale that IRON's effort input is built on. Also reports that stronger load-velocity relationships exist in trained lifters than in novices, which is consistent with novices being less able to judge their own proximity to failure.
 
 **Rule for IRON:** Defines the scale. No engine constant, but this is the citation for why RIR exists in the app at all.
 
@@ -174,7 +180,7 @@ Free full text: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7927075/
 
 ### schoenfeld2019
 
-**Citation:** Schoenfeld BJ, Grgic J, Krieger J. How many times per week should a muscle be trained to maximize muscle hypertrophy? A systematic review and meta-analysis of studies examining the effects of resistance training frequency. *Journal of Sports Science*. 2019;37(11):1286-1295. https://doi.org/10.1080/02640414.2018.1555906
+**Citation:** Schoenfeld BJ, Grgic J, Krieger J. How many times per week should a muscle be trained to maximize muscle hypertrophy? A systematic review and meta-analysis of studies examining the effects of resistance training frequency. *Journal of Sports Sciences*. 2019;37(11):1286-1295. https://doi.org/10.1080/02640414.2018.1555906
 
 **Access:** Abstract
 
@@ -254,6 +260,20 @@ where w is weight in kilograms and r is reps. At light weights each extra rep im
 
 ---
 
+### reynolds2006
+
+**Citation:** Reynolds et al. 2006. **Full citation not yet located.**
+
+**Access:** Not read. Known only secondhand.
+
+**Finding (as reported by vbt_free_weight_inaccurate):** Repetitions-performed 1RM equations predicted more accurately on the chest press and leg press from a 5RM load than from 10RM or 20RM loads, indicating these equations are only accurate with fatiguing loads close to a 1RM.
+
+**Rule for IRON:** Down-weight or flag `estimated_1rm` from sets above 12 reps in trend views. Never present a 1RM computed from a 15+ rep set as the user's max.
+
+**Caveats:** This is the actual source of the high-rep accuracy rule, but it has only been read through another paper's citation of it. Locate and read the primary source before treating `ONE_RM_MAX_RELIABLE_REPS` as properly cited. The rule itself is sound and consistent with marzagao2026 being fit on near-failure sets, so it can stay in the engine meanwhile, but the citation is incomplete.
+
+---
+
 ### one_rm_exercise_dependent
 
 **Citation:** Validity of predictive equations for one repetition maximum across exercises. https://research.usc.edu.au/esploro/outputs/journalArticle/Validade-das-equações-preditivas-de-uma/99448976802621
@@ -264,25 +284,29 @@ where w is weight in kilograms and r is reps. At light weights each extra rep im
 
 **Rule for IRON:** Supports using a weight-dependent formula (marzagao2026) over any single classical formula. Per-machine tracking already segments by exercise, which is the axis this varies along.
 
-**Caveats:** Full citation needs to be completed from the source page.
-
----
-
-### one_rm_high_rep_accuracy
-
-**Citation:** Accuracy of Predicting One-Repetition Maximum from Submaximal Velocity in the Barbell Back Squat and Bench Press. *Journal of Human Kinetics*. https://jhk.termedia.pl/Accuracy-of-Predicting-One-Repetition-Maximum-from-Submaximal-Velocity-in-the-Barbell,158707,0,2.html
-
-**Access:** Abstract
-
-**Finding:** Repetition-based 1RM estimates are more accurate with loads close to 1RM. A 5RM predicts 1RM better than a 10RM or 20RM.
-
-**Rule for IRON:** Down-weight or flag `estimated_1rm` from sets above 12 reps in trend views. Never present a 1RM computed from a 15+ rep set as the user's max.
-
-**Caveats:** Full citation needs to be completed from the source page.
+**Caveats:** **INCOMPLETE AND UNVERIFIED.** Authors, year, and journal still need to be filled in from the source page. Built from an abstract only. Given that the neighbouring entry in this section turned out to be mis-attributed, verify this finding is the paper's own result before relying on it.
 
 ---
 
 ## Athletic and power training (background only)
+
+### vbt_free_weight_inaccurate
+
+**Citation:** Accuracy of Predicting One-Repetition Maximum from Submaximal Velocity in the Barbell Back Squat and Bench Press. *Journal of Human Kinetics*. https://jhk.termedia.pl/Accuracy-of-Predicting-One-Repetition-Maximum-from-Submaximal-Velocity-in-the-Barbell,158707,0,2.html
+
+**Access:** Full text
+
+**Finding:** Seventeen well-trained men performed squat and bench press 1RM tests with average concentric velocity recorded on every warm-up and attempt. Both 2-point and 4-point submaximal velocity regression forecasts differed significantly from the actual 1RM. The squat was overpredicted by 18.5% (2-point) and 23.8% (4-point); the bench press was off by 8.2% and 6.3%. Bland-Altman and mountain plots showed poor agreement with wide limits. The authors advise against using submaximal velocity to predict 1RM in free-weight barbell movements.
+
+An important methodological detail: participants were deliberately given no maximal-intended-velocity cue, to increase ecological validity. The authors argue this explains the disagreement with earlier studies that found velocity prediction accurate, since those provided the cue. Prediction has also been more accurate on machine-based movements than free weights in other work.
+
+**Rule for IRON:** None. This is a reason not to pursue velocity-based features even if hardware were available, and a counterweight to the more positive VBT reviews below.
+
+**Caveats:** Author list not yet captured; fill in from the abstract page or PDF. Squat and bench only, well-trained young men only.
+
+**Correction note:** An earlier draft of this document keyed this paper as `one_rm_high_rep_accuracy` and cited it as the basis for down-weighting high-rep 1RM estimates. That was wrong. The 5RM-versus-10RM finding belongs to Reynolds et al. (2006), which this paper cites in its introduction. See the `reynolds2006` entry above.
+
+---
 
 ### wlodarczyk2021
 
@@ -319,20 +343,27 @@ Quick reference for what the engine does and why. Constants live in `api/app/ser
 | Count indirect sets as | 0.5 | pelland2026 |
 | Hypertrophy RIR target | 0-2 | robinson2024 |
 | Strength RIR target | 1-4 | robinson2024 |
+| Novice RIR target | 2-3 | judgment call, see note |
 | Strength load floor | 80% est. 1RM | currier2023 |
 | Min frequency per muscle | 2x/week | schoenfeld2016 |
 | Recovery after failure sets | 48h | moran_navarro2017, pareja_blanco2020 |
 | Failure sets to trigger recovery rule | 2 | moran_navarro2017 |
 | Recovery rule granularity | per muscle group | belcher2019 |
 | 1RM formula | weight-dependent, kg | marzagao2026 |
-| 1RM reliable rep ceiling | 12 | one_rm_high_rep_accuracy |
+| 1RM reliable rep ceiling | 12 | reynolds2006 (citation incomplete) |
 | Hypertrophy volume cap | none | pelland2026 |
 | Strength volume behavior | plateau | pelland2026 |
+| Per-session set cap | TBD | remmert2025 (unread) |
+
+**Note on judgment calls:** the novice RIR target and the "general" goal target are not findings. They are our decisions, informed by the evidence that RIR estimation is least reliable in untrained lifters and that failure training carries the highest injury and recovery cost. They should be labeled as project decisions in any write-up, not presented as research conclusions.
 
 ## Open items
 
 - Read pelland2026 Table 4 for the numeric strength volume plateau
 - Read remmert2025 full text for the per-session set cap
-- Complete citations for the two 1RM validity papers
+- obtain full text for exact R² by rep range if finer-grained thresholds are wanted
+- Complete the citation for one_rm_exercise_dependent and verify its finding is its own
+- Capture the author list for vbt_free_weight_inaccurate
+- Get robinson2024 full text through RPI library access
 - Read zourdos2016 and lopez2021 in full
-- Decide the "general" goal RIR target (currently 1-3, a judgment call between the two evidenced targets)
+- Decide the "general" goal RIR target (currently 1-3)

@@ -1,0 +1,305 @@
+{
+  "_meta": {
+    "description": "Machine-readable citations for IRON's progression engine. Keys match the entry keys in docs/research.md. Engine rules reference these keys in their 'basis' field so every suggestion can name the evidence behind it.",
+    "last_updated": "2026-09-18"
+  },
+
+  "pelland2026": {
+    "authors": "Pelland JC, Remmert JF, Robinson ZP, Hinson SR, Zourdos MC",
+    "year": 2026,
+    "title": "The Resistance Training Dose Response: Meta-Regressions Exploring the Effects of Weekly Volume and Frequency on Muscle Hypertrophy and Strength Gains",
+    "journal": "Sports Medicine",
+    "volume": "56(2)",
+    "pages": "481-505",
+    "doi": "10.1007/s40279-025-02344-w",
+    "url": "https://doi.org/10.1007/s40279-025-02344-w",
+    "type": "meta-regression",
+    "access": "full text",
+    "finding": "Hypertrophy and strength both increase with weekly volume, with diminishing returns. Strength plateaus; hypertrophy follows a square-root curve. Frequency matters for strength, negligibly for hypertrophy once volume is equated. Fractional set counting (indirect sets at 0.5) predicted outcomes best.",
+    "caveats": "The 0.5 indirect-set weighting is an authors' assumption. Sample skewed young and male."
+  },
+
+  "remmert2025": {
+    "authors": "Remmert JF, Pelland JC, Robinson ZP, Hinson SR, Zourdos MC",
+    "year": 2025,
+    "title": "Meta-Regressions of the Effect of Per-Session Volume on Hypertrophy and Strength",
+    "journal": "SportRxiv preprint",
+    "doi": "https://doi.org/10.48550/arXiv.2603.17495",
+    "url": "https://sportrxiv.org/index.php/server/preprint/view/537",
+    "type": "preprint",
+    "access": "abstract",
+    "finding": "Identifies a per-session set count beyond which additional sets stop producing a likely-meaningful difference.",
+    "caveats": "Preprint, not peer reviewed. Full text not yet read; the specific cap value is still a placeholder in constants.py."
+  },
+
+  "schoenfeld2017": {
+    "authors": "Schoenfeld BJ, Ogborn D, Krieger JW",
+    "year": 2017,
+    "title": "Dose-response relationship between weekly resistance training volume and increases in muscle mass: a systematic review and meta-analysis",
+    "journal": "Journal of Sports Sciences",
+    "volume": "35(11)",
+    "pages": "1073-1082",
+    "doi": "10.1080/02640414.2016.1210197",
+    "url": "https://doi.org/10.1080/02640414.2016.1210197",
+    "type": "meta-analysis",
+    "access": "abstract",
+    "finding": "Graded dose-response between weekly sets and hypertrophy.",
+    "superseded_by": "pelland2026"
+  },
+
+  "robinson2024": {
+    "authors": "Robinson ZP, Pelland JC, Remmert JF, Refalo MC, Jukic I, Steele J, Zourdos MC",
+    "year": 2024,
+    "title": "Exploring the Dose-Response Relationship Between Estimated Resistance Training Proximity to Failure, Strength Gain, and Muscle Hypertrophy: A Series of Meta-Regressions",
+    "journal": "Sports Medicine",
+    "volume": "54(9)",
+    "pages": "2209-2231",
+    "doi": "10.1007/s40279-024-02069-2",
+    "url": "https://doi.org/10.1007/s40279-024-02069-2",
+    "data_url": "https://osf.io/7knsj/",
+    "type": "meta-regression",
+    "access": "abstract",
+    "finding": "Strength gains were similar across a wide RIR range. Hypertrophy increased as sets were terminated closer to failure.",
+    "caveats": "Authors call the analysis exploratory. RIR was estimated from study descriptions, not measured. This is the most important paper for the engine and also the one with the most stated uncertainty."
+  },
+
+  "zourdos2016": {
+    "authors": "Zourdos MC, Klemp A, Dolan C, et al.",
+    "year": 2016,
+    "title": "Novel Resistance Training-Specific Rating of Perceived Exertion Scale Measuring Repetitions in Reserve",
+    "journal": "Journal of Strength and Conditioning Research",
+    "volume": "30(1)",
+    "pages": "267-275",
+    "doi": "10.1519/JSC.0000000000001049",
+    "url": "https://doi.org/10.1519/JSC.0000000000001049",
+    "type": "original research",
+    "access": "not yet read",
+    "finding": "Establishes the RIR-based RPE scale that IRON's effort input is built on. Also reports that stronger load-velocity relationships exist in trained lifters than in novices.",
+    "caveats": "No engine constant derives from this. It is the citation for why RIR exists in the app at all."
+  },
+
+  "currier2023": {
+    "authors": "Currier BS, Mcleod JC, Banfield L, et al.",
+    "year": 2023,
+    "title": "Resistance training prescription for muscle strength and hypertrophy in healthy adults: a systematic review and Bayesian network meta-analysis",
+    "journal": "British Journal of Sports Medicine",
+    "volume": "57(18)",
+    "pages": "1211-1220",
+    "doi": "10.1136/bjsports-2023-106807",
+    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10579494/",
+    "type": "network meta-analysis",
+    "access": "abstract",
+    "finding": "Higher-load prescriptions (above 80% 1RM) maximized strength gains. All load prescriptions promoted hypertrophy comparably.",
+    "caveats": "Healthy adults, mixed training status."
+  },
+
+  "schoenfeld2021": {
+    "authors": "Schoenfeld BJ, Grgic J, Van Every DW, Plotkin DL",
+    "year": 2021,
+    "title": "Loading Recommendations for Muscle Strength, Hypertrophy, and Local Endurance: A Re-Examination of the Repetition Continuum",
+    "journal": "Sports",
+    "volume": "9(2)",
+    "pages": "32",
+    "doi": "10.3390/sports9020032",
+    "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7927075/",
+    "type": "review",
+    "access": "abstract",
+    "finding": "The traditional repetition continuum is not well supported. Hypertrophy occurs across a wide load spectrum when sets approach failure; strength favors heavier loads.",
+    "caveats": null
+  },
+
+  "lopez2021": {
+    "authors": "Lopez P, Radaelli R, Taaffe DR, et al.",
+    "year": 2021,
+    "title": "Resistance Training Load Effects on Muscle Hypertrophy and Strength Gain: Systematic Review and Network Meta-analysis",
+    "journal": "Medicine and Science in Sports and Exercise",
+    "volume": "53(6)",
+    "pages": "1206-1216",
+    "doi": "10.1249/MSS.0000000000002585",
+    "url": "https://doi.org/10.1249/MSS.0000000000002585",
+    "type": "network meta-analysis",
+    "access": "not yet read",
+    "finding": "Confirms load-independence of hypertrophy.",
+    "caveats": "Supporting citation for schoenfeld2021 and currier2023."
+  },
+
+  "schoenfeld2016": {
+    "authors": "Schoenfeld BJ, Ogborn D, Krieger JW",
+    "year": 2016,
+    "title": "Effects of Resistance Training Frequency on Measures of Muscle Hypertrophy: A Systematic Review and Meta-Analysis",
+    "journal": "Sports Medicine",
+    "volume": "46(11)",
+    "pages": "1689-1697",
+    "doi": "10.1007/s40279-016-0543-8",
+    "url": "https://doi.org/10.1007/s40279-016-0543-8",
+    "type": "meta-analysis",
+    "access": "abstract",
+    "finding": "Training a muscle twice per week produced more hypertrophy than once per week on a volume-equated basis. Whether three beats two was undetermined.",
+    "caveats": null
+  },
+
+  "schoenfeld2019": {
+    "authors": "Schoenfeld BJ, Grgic J, Krieger J",
+    "year": 2019,
+    "title": "How many times per week should a muscle be trained to maximize muscle hypertrophy? A systematic review and meta-analysis of studies examining the effects of resistance training frequency",
+    "journal": "Journal of Sports Sciences",
+    "volume": "37(11)",
+    "pages": "1286-1295",
+    "doi": "10.1080/02640414.2018.1555906",
+    "url": "https://doi.org/10.1080/02640414.2018.1555906",
+    "type": "meta-analysis",
+    "access": "abstract",
+    "finding": "When weekly volume is equated, frequency has no meaningful effect on hypertrophy.",
+    "caveats": "Not in conflict with pelland2026, which finds frequency does matter for strength. Different outcomes."
+  },
+
+  "moran_navarro2017": {
+    "authors": "Moran-Navarro R, Perez CE, Mora-Rodriguez R, et al.",
+    "year": 2017,
+    "title": "Time course of recovery following resistance training leading or not to failure",
+    "journal": "European Journal of Applied Physiology",
+    "volume": "117(12)",
+    "pages": "2387-2399",
+    "doi": "10.1007/s00421-017-3725-7",
+    "url": "https://doi.org/10.1007/s00421-017-3725-7",
+    "type": "original research",
+    "access": "abstract",
+    "finding": "Training to failure caused a significantly larger acute drop in neuromuscular performance than non-failure training at equal volume, with slower recovery at 24-48h.",
+    "caveats": null
+  },
+
+  "pareja_blanco2020": {
+    "authors": "Pareja-Blanco F, Rodriguez-Rosell D, Aagaard P, et al.",
+    "year": 2020,
+    "title": "Time Course of Recovery From Resistance Exercise With Different Set Configurations",
+    "journal": "Journal of Strength and Conditioning Research",
+    "volume": "34(10)",
+    "pages": "2867-2876",
+    "doi": "10.1519/JSC.0000000000002756",
+    "url": "https://doi.org/10.1519/JSC.0000000000002756",
+    "type": "original research",
+    "access": "abstract",
+    "finding": "Sets to failure, especially high-rep ones, produced mechanical deficits persisting up to 48 hours.",
+    "caveats": "Supports the 48-hour rule alongside moran_navarro2017."
+  },
+
+  "belcher2019": {
+    "authors": "Belcher DJ, Sousa CA, Carzoli JP, et al.",
+    "year": 2019,
+    "title": "Time course of recovery is similar for the back squat, bench press, and deadlift in well-trained males",
+    "journal": "Applied Physiology, Nutrition, and Metabolism",
+    "volume": "44(10)",
+    "pages": "1033-1042",
+    "doi": "10.1139/apnm-2019-0004",
+    "url": "https://doi.org/10.1139/apnm-2019-0004",
+    "type": "original research",
+    "access": "abstract",
+    "finding": "Squat, bench, and deadlift recovered on similar timelines when assessed at 24, 48, 72, and 96 hours.",
+    "caveats": "Twelve well-trained males. Do not generalize exact timelines to beginners."
+  },
+
+  "marzagao2026": {
+    "authors": "Marzagao T",
+    "year": 2026,
+    "title": "A Weight-Dependent 1RM Prediction Equation Optimized on 303,494 Near-Failure Sets Across 388 Exercises",
+    "journal": "arXiv preprint",
+    "doi": "https://doi.org/10.48550/arXiv.2603.17495",
+    "url": "https://arxiv.org/abs/2603.17495",
+    "alt_url": "https://sportrxiv.org/index.php/server/preprint/view/768",
+    "type": "preprint",
+    "access": "abstract and partial text",
+    "finding": "Classical 1RM formulas use a fixed conversion factor for every exercise. A weight-dependent factor reduced inconsistency by 17-22% versus Epley, Brzycki, Wathen, and Mayhew, improving on every exercise tested.",
+    "formula": "1RM = w * (1 + (r - 1)^0.85 / (-2.55 + 4.58 * ln(w)))  [w in kilograms]",
+    "caveats": "Preprint by a Fitbod employee, optimized on Fitbod data. Validated by internal consistency, not against measured 1RMs. Denominator goes non-positive below roughly 1.8 kg."
+  },
+
+"reynolds2006": {
+    "authors": "Reynolds JM, Gordon TJ, Robergs RA",
+    "year": 2006,
+    "title": "Prediction of One Repetition Maximum Strength From Multiple Repetition Maximum Testing and Anthropometry",
+    "journal": "Journal of Strength and Conditioning Research",
+    "volume": "20(3)",
+    "pages": "584-592",
+    "doi": "10.1519/R-15304.1",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/16937972/",
+    "type": "original research",
+    "access": "abstract",
+    "finding": "Seventy subjects (34 men, 36 women, ages 18-69) completed 1RM, 5RM, 10RM, and 20RM testing on the bench press (chest press) and plate-loaded leg press. Load decreased nonlinearly as rep number increased. Prediction equations built from the 5RM test were most accurate (R-squared 0.993 for bench press, 0.974 for leg press), with accuracy degrading substantially at 10RM and 20RM.",
+    "caveats": "Correlations to 1RM consistently decreased as the RM used for prediction increased, for both exercises. Cited secondhand in an earlier draft via macarilla2022; now located and confirmed independently through marzagao2026's citation of the same paper, which reports the same R-squared values. No longer a placeholder."
+  },
+
+  "meneses2013": {
+    "authors": "Meneses AL, Santana FS, Soares AHG, Souza BCC, Souza DJCA, Santos MAM, Cyrino ES, Ritti-Dias RM",
+    "year": 2013,
+    "title": "Validade das equacoes preditivas de uma repeticao maxima varia de acordo com o exercicio realizado em adultos jovens treinados [Validity of one repetition maximum predictive equations vary according to the exercise performed in trained young adults]",
+    "journal": "Revista Brasileira de Atividade Fisica & Saude",
+    "volume": "18(1)",
+    "pages": "95-104",
+    "doi": "10.12820/2317-1634.2013v18n1p95",
+    "url": "https://doi.org/10.12820/2317-1634.2013v18n1p95",
+    "language": "Portuguese",
+    "type": "original research",
+    "access": "abstract",
+    "finding": "Sixteen trained men performed 1RM and 8-12RM tests on leg press 45 degrees, bench press, unilateral knee extension, central rowing, knee flexion, and front raises, compared against six classical equations (Adams, Baechle & Groves, Brzycki, Epley, Lander, O'Connor). Every equation overestimated leg press 1RM by 6-15%. Different equations were most accurate on different exercises: O'Connor best for bench press and knee extension, Adams for front raises, Baechle & Groves for knee flexion, Brzycki and Epley best for rowing. The authors conclude 1RM predictive equation validity is exercise-dependent.",
+    "caveats": "Sixteen trained young men, published in Portuguese. Abstract read only. Supports using a weight-dependent formula (marzagao2026) over any single fixed-factor classical equation; per-machine tracking already segments by the axis this varies along."
+  },
+
+  "macarilla2022": {
+    "authors": "Macarilla CT, Sautter NM, Robinson ZP, Juber MC, Hickmott LM, Cerminaro RM, Benitez B, Carzoli JP, Bazyler CD, Zoeller RF, Whitehurst M, Zourdos MC",
+    "year": 2022,
+    "title": "Accuracy of Predicting One-Repetition Maximum from Submaximal Velocity in the Barbell Back Squat and Bench Press",
+    "journal": "Journal of Human Kinetics",
+    "volume": "82",
+    "pages": "201-212",
+    "doi": "10.2478/hukin-2022-0046",
+    "url": "https://jhk.termedia.pl/Accuracy-of-Predicting-One-Repetition-Maximum-from-Submaximal-Velocity-in-the-Barbell,158707,0,2.html",
+    "type": "original research",
+    "access": "full text",
+    "finding": "Linear regression forecasts using 2- and 4-point submaximal velocity methods produced inaccurate 1RM predictions in the free-weight back squat and bench press in 17 well-trained men. The squat 1RM was overpredicted by 18.5% (2-point) and 23.8% (4-point); bench press predictions were off by 8.2% and 6.3%. The authors advise against using submaximal velocity to predict 1RM in free-weight barbell movements.",
+    "caveats": "Author list not captured from the full text; fill in from the abstract page or PDF. Seventeen well-trained young men, squat and bench only. Notably, no maximal-intended-velocity cue was given, which the authors suggest explains the disagreement with studies that found velocity prediction accurate. Prediction was more accurate on machine-based movements in other work.",
+    "note": "This entry was previously mis-keyed as one_rm_high_rep_accuracy and cited as the basis for down-weighting high-rep 1RM estimates. That was an error: the 5RM-versus-10RM finding belongs to Reynolds et al. 2006, which this paper only cites. This paper is a velocity-based-training paper with a negative result."
+  },
+
+  "wlodarczyk2021": {
+    "authors": "Wlodarczyk M, Adamczewski P, Bogumil B, Kuzniar M",
+    "year": 2021,
+    "title": "Effects of Velocity-Based Training on Strength and Power in Elite Athletes: A Systematic Review",
+    "journal": "International Journal of Environmental Research and Public Health",
+    "volume": "18(10)",
+    "pages": "5257",
+    "doi": "10.3390/ijerph18105257",
+    "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8156188/",
+    "type": "systematic review",
+    "access": "abstract",
+    "finding": "Velocity loss thresholds of 10-20% within a set help induce neuromuscular adaptations while limiting fatigue.",
+    "caveats": "Background only. Velocity-based training requires a bar-speed sensor and is not implementable from logged sets. Note that vbt_free_weight_inaccurate is a negative result on velocity-based 1RM prediction specifically."
+  },
+
+  "zhang2022": {
+    "authors": "Zhang M, Tan Q, Sun J, et al.",
+    "year": 2022,
+    "title": "Comparison of Velocity and Percentage-based Training on Maximal Strength: Meta-analysis",
+    "journal": "International Journal of Environmental Research and Public Health",
+    "doi": null,
+    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9368129",
+    "type": "meta-analysis",
+    "access": "abstract",
+    "finding": "Meta-analysis of velocity-based training effects on lower-body strength, jump, and sprint in trained individuals.",
+    "caveats": "Background only. Same hardware limitation as wlodarczyk2021."
+  },
+
+  "lesuer1997": {
+    "authors": "LeSuer DA, McCormick JH, Mayhew JL, Wasserstein RL, Arnold MD",
+    "year": 1997,
+    "title": "The Accuracy of Prediction Equations for Estimating 1-RM Performance in the Bench Press, Squat, and Deadlift",
+    "journal": "Journal of Strength and Conditioning Research",
+    "volume": "11(4)",
+    "pages": "211-213",
+    "doi": null,
+    "url": "https://journals.lww.com/nsca-jscr/abstract/1997/11000/the_accuracy_of_prediction_equations_for.1.aspx",
+    "type": "original research",
+    "access": "abstract",
+    "finding": "Sixty-seven untrained college students (40 men, 27 women) tested seven prediction equations against actual 1RM on bench press, squat, and deadlift. Correlations between predicted and actual 1RM were uniformly high (r > 0.95) across all equations, but absolute accuracy varied meaningfully by exercise. All equations significantly underestimated the deadlift 1RM. For the bench press, only 2 of 7 equations were accurate, with the rest underestimating by 0.8-6%; for the squat, only Wathan's equation was accurate, with the rest underestimating by 2-8%. Accuracy also degraded as reps-to-fatigue exceeded 10.",
+    "caveats": "Untrained college students, not trained lifters. Early and widely cited evidence, alongside meneses2013, that a single fixed-factor equation does not generalize across exercises. Located via marzagao2026's citation of it; abstract and secondary summaries read, not the full text."
+  }
+}
