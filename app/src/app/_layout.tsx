@@ -1,17 +1,18 @@
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-const colors = { background: '#101319', card: '#191e27', text: '#f5f7fa', accent: '#e6b75c' };
+import { colors } from '@/constants/theme';
 
 export default function RootLayout() {
   return <>
     <StatusBar style="light" />
     <Tabs screenOptions={{
+      headerShown: false,
       headerStyle: { backgroundColor: colors.background },
       headerTintColor: colors.text,
-      tabBarStyle: { backgroundColor: colors.card, borderTopColor: '#303745' },
+      tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
       tabBarActiveTintColor: colors.accent,
-      tabBarInactiveTintColor: '#9aa5b5',
+      tabBarInactiveTintColor: colors.textMuted,
       sceneStyle: { backgroundColor: colors.background },
     }}>
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
