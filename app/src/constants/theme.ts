@@ -5,6 +5,8 @@ export const colors = {
   checked: '#2A2A2A',
   accent: '#FF3D00',
   accentDark: '#2B0C05',
+  orange: '#FF8A00',
+  yellow: '#FFD000',
   text: '#FFFFFF',
   textMuted: '#777777',
   textSubtle: '#555555',
