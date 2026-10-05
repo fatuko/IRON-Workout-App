@@ -26,6 +26,10 @@ Decision logic (see docs/research.md "Rules summary" for citations):
        This is a hard constraint, not a tunable constant.
     7. Return the suggestion with a plain-language reason and the
        citation keys of every rule that fired.
+    8. For the strength goal, flag (never override) when the suggested
+       weight is below STRENGTH_LOAD_FLOOR_PCT_1RM of estimated 1RM, so
+       the UI can note that heavier loads tend to help strength without
+       the engine changing the user's plan.
 """
 
 from app.services.one_rm import estimate_1rm
@@ -34,6 +38,7 @@ from app.services.constants import (
     NOVICE_RIR_TARGET,
     RIR_TREND_WINDOW_SESSIONS,
     LOAD_INCREMENT_PCT,
+    STRENGTH_LOAD_FLOOR_PCT_1RM,
 )
 
 
@@ -60,6 +65,9 @@ def suggest_next(
             "suggested_reps": int,
             "reason": str,
             "basis": list[str],
+            "current_estimated_1rm": float,
+            "estimate_low_confidence": bool,
+            "below_strength_load_floor": bool,
         }
     """
     if not recent_sets:
@@ -135,6 +143,11 @@ def suggest_next(
         min(suggested_reps, exercise["rep_range_max"]),
     )
 
+    below_strength_floor = (
+        goal == "strength"
+        and suggested_weight_kg < STRENGTH_LOAD_FLOOR_PCT_1RM * best["estimated_1rm"]
+    )
+
     return {
         "suggested_weight_kg": suggested_weight_kg,
         "suggested_reps": suggested_reps,
@@ -142,4 +155,6 @@ def suggest_next(
         "basis": basis,
         "current_estimated_1rm": best["estimated_1rm"],
         "estimate_low_confidence": best["low_confidence"],
+        "below_strength_load_floor": below_strength_floor,
     }
+
