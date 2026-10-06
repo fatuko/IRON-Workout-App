@@ -10,7 +10,6 @@ type SplitDay = {
   id: string;
   name: string;
   workoutDay: string;
-  muscles: string;
   color: string;
   exercises: Exercise[];
 };
@@ -27,7 +26,7 @@ const palette = [
 
 const starterDays: SplitDay[] = [
   {
-    id: 'push', name: 'PUSH DAY', workoutDay: 'MONDAY', muscles: 'CHEST · SHOULDERS · TRICEPS',
+    id: 'push', name: 'PUSH DAY', workoutDay: 'MONDAY',
     color: palette[0].color,
     exercises: [
       { id: 'bench', name: 'Incline Bench Press', sets: '3', target: '6–8', unit: 'REPS', pr: '195 LB × 6' },
@@ -36,7 +35,7 @@ const starterDays: SplitDay[] = [
     ],
   },
   {
-    id: 'pull', name: 'PULL DAY', workoutDay: 'TUESDAY', muscles: 'BACK · BICEPS · REAR DELTS',
+    id: 'pull', name: 'PULL DAY', workoutDay: 'TUESDAY',
     color: palette[5].color,
     exercises: [
       { id: 'pulldown', name: 'Lat Pulldown', sets: '3', target: '6–10', unit: 'REPS', pr: '150 LB × 8' },
@@ -45,7 +44,7 @@ const starterDays: SplitDay[] = [
     ],
   },
   {
-    id: 'legs', name: 'LEGS DAY', workoutDay: 'WEDNESDAY', muscles: 'QUADS · HAMS · GLUTES · CALVES',
+    id: 'legs', name: 'LEGS DAY', workoutDay: 'WEDNESDAY',
     color: palette[4].color,
     exercises: [
       { id: 'squat', name: 'Hack Squat', sets: '4', target: '6–10', unit: 'REPS', pr: '270 LB × 7' },
@@ -86,7 +85,7 @@ export default function SplitsScreen() {
     const option = palette[days.length % palette.length];
     const id = makeId('day');
     setDays((current) => [...current, {
-      id, name: 'NEW DAY', workoutDay: 'THURSDAY', muscles: 'MUSCLE GROUPS', color: option.color, exercises: [],
+      id, name: 'NEW DAY', workoutDay: 'THURSDAY', color: option.color, exercises: [],
     }]);
     setExpandedId(id);
     setEditingId(id);
@@ -122,13 +121,9 @@ export default function SplitsScreen() {
                       style={styles.workoutDayInput} value={day.workoutDay} />
                     <TextInput accessibilityLabel="Split day name" autoCapitalize="characters"
                       onChangeText={(name) => updateDay(day.id, { name })} style={styles.titleInput} value={day.name} />
-                    <TextInput accessibilityLabel="Muscle groups" autoCapitalize="characters"
-                      onChangeText={(muscles) => updateDay(day.id, { muscles })}
-                      style={styles.muscleInput} value={day.muscles} />
                   </> : <>
                     <Text style={styles.workoutDay}>{day.workoutDay}</Text>
                     <Text style={styles.dayTitle}>{day.name}</Text>
-                    <Text style={styles.muscles}>{day.muscles}</Text>
                   </>}
                   <Text style={styles.count}>{day.exercises.length} {day.exercises.length === 1 ? 'exercise' : 'exercises'}</Text>
                 </Pressable>
@@ -213,8 +208,6 @@ const styles = StyleSheet.create({
   workoutDayInput: { color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.textSubtle, fontSize: 10, fontWeight: '800', letterSpacing: 1.8, paddingVertical: 3 },
   dayTitle: { color: colors.text, fontSize: 25, lineHeight: 29, fontWeight: '900', letterSpacing: -0.5 },
   titleInput: { color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.textSubtle, fontSize: 24, lineHeight: 29, fontWeight: '900', paddingVertical: 2 },
-  muscles: { color: colors.textMuted, fontSize: 9, lineHeight: 13, fontWeight: '700', letterSpacing: 1.2 },
-  muscleInput: { color: colors.textMuted, borderBottomWidth: 1, borderBottomColor: colors.textSubtle, fontSize: 9, fontWeight: '700', letterSpacing: 1.2, paddingVertical: 4 },
   count: { color: colors.textMuted, fontSize: 9, letterSpacing: 1, marginTop: 2 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   editButton: { minWidth: 56, height: 34, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
