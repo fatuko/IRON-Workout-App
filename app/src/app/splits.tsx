@@ -112,17 +112,23 @@ export default function SplitsScreen() {
           const expanded = expandedId === day.id;
           const editing = editingId === day.id;
           return (
-            <View key={day.id} style={[styles.card, { borderColor: day.color }]}>
+            <View key={day.id} style={styles.card}>
               <View style={styles.cardHeader}>
                 <Pressable onPress={() => setExpandedId(expanded ? null : day.id)} style={styles.dayInfo}>
                   {editing ? <>
-                    <TextInput accessibilityLabel="Workout day" autoCapitalize="characters"
-                      onChangeText={(workoutDay) => updateDay(day.id, { workoutDay })}
-                      style={styles.workoutDayInput} value={day.workoutDay} />
+                    <View style={styles.workoutDayRow}>
+                      <View style={[styles.colorDot, { backgroundColor: day.color }]} />
+                      <TextInput accessibilityLabel="Workout day" autoCapitalize="characters"
+                        onChangeText={(workoutDay) => updateDay(day.id, { workoutDay })}
+                        style={styles.workoutDayInput} value={day.workoutDay} />
+                    </View>
                     <TextInput accessibilityLabel="Split day name" autoCapitalize="characters"
                       onChangeText={(name) => updateDay(day.id, { name })} style={styles.titleInput} value={day.name} />
                   </> : <>
-                    <Text style={styles.workoutDay}>{day.workoutDay}</Text>
+                    <View style={styles.workoutDayRow}>
+                      <View style={[styles.colorDot, { backgroundColor: day.color }]} />
+                      <Text style={styles.workoutDay}>{day.workoutDay}</Text>
+                    </View>
                     <Text style={styles.dayTitle}>{day.name}</Text>
                   </>}
                   <Text style={styles.count}>{day.exercises.length} {day.exercises.length === 1 ? 'exercise' : 'exercises'}</Text>
@@ -201,19 +207,21 @@ const styles = StyleSheet.create({
   page: { paddingHorizontal: spacing.xl, paddingTop: spacing.xl, paddingBottom: 64, gap: spacing.xl, backgroundColor: colors.background },
   pageTitle: { color: colors.text, fontSize: 34, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
   dayList: { gap: spacing.lg },
-  card: { borderWidth: 1, borderRadius: 8, padding: spacing.lg, overflow: 'hidden', backgroundColor: colors.surface },
+  card: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: spacing.lg, overflow: 'hidden', backgroundColor: colors.surface },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   dayInfo: { flex: 1, minWidth: 0, gap: 5 },
-  workoutDay: { color: colors.text, fontSize: 10, fontWeight: '800', letterSpacing: 1.8 },
-  workoutDayInput: { color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.textSubtle, fontSize: 10, fontWeight: '800', letterSpacing: 1.8, paddingVertical: 3 },
+  workoutDayRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  colorDot: { width: 8, height: 8, borderRadius: 4 },
+  workoutDay: { color: colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.8 },
+  workoutDayInput: { flex: 1, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.textSubtle, fontSize: 10, fontWeight: '800', letterSpacing: 1.8, paddingVertical: 3 },
   dayTitle: { color: colors.text, fontSize: 25, lineHeight: 29, fontWeight: '900', letterSpacing: -0.5 },
   titleInput: { color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.textSubtle, fontSize: 24, lineHeight: 29, fontWeight: '900', paddingVertical: 2 },
   count: { color: colors.textMuted, fontSize: 9, letterSpacing: 1, marginTop: 2 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  editButton: { minWidth: 56, height: 34, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  editButtonActive: { backgroundColor: colors.text },
-  editText: { color: colors.textMuted, fontSize: 9, fontWeight: '900', letterSpacing: 1.6 },
-  editTextActive: { color: colors.black },
+  editButton: { minWidth: 56, height: 34, borderWidth: 1, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  editButtonActive: { backgroundColor: colors.accent },
+  editText: { color: colors.accent, fontSize: 9, fontWeight: '900', letterSpacing: 1.6 },
+  editTextActive: { color: colors.text },
   expandButton: { width: 24, height: 40, alignItems: 'center', justifyContent: 'center' },
   chevron: { color: colors.textMuted, fontSize: 23, lineHeight: 24 },
   chevronExpanded: { transform: [{ rotate: '180deg' }] },
@@ -246,8 +254,8 @@ const styles = StyleSheet.create({
   outlineText: { color: colors.text, fontSize: 9, fontWeight: '900', letterSpacing: 1.8 },
   deleteButton: { alignSelf: 'center', padding: spacing.sm },
   deleteText: { color: colors.textMuted, fontSize: 9, fontWeight: '800', letterSpacing: 1.5 },
-  startButton: { height: 46, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
-  startText: { color: colors.black, fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  addDayButton: { minHeight: 64, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  addDayText: { color: colors.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 2.5 },
+  startButton: { height: 46, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
+  startText: { color: colors.text, fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  addDayButton: { minHeight: 64, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  addDayText: { color: colors.accent, fontSize: 11, fontWeight: '700', letterSpacing: 2.5 },
 });

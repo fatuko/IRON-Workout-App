@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import {
   Alert,
@@ -23,7 +23,6 @@ type WorkoutSet = {
 type Exercise = {
   id: string;
   name: string;
-  equipment: string;
   repRange: string;
   lastPerformance: string;
   restSeconds: number;
@@ -43,7 +42,6 @@ const initialExercises: Exercise[] = [
   {
     id: 'incline-press',
     name: 'INCLINE CHEST PRESS',
-    equipment: "Machine #3 · Gold's Gym",
     repRange: '8–12 reps',
     lastPerformance: 'Last: 185 lb × 8, 8, 7',
     restSeconds: 180,
@@ -52,7 +50,6 @@ const initialExercises: Exercise[] = [
   {
     id: 'shoulder-press',
     name: 'SHOULDER PRESS',
-    equipment: "Hammer Strength · Gold's Gym",
     repRange: '6–10 reps',
     lastPerformance: 'Last: 90 lb × 10, 9, 8',
     restSeconds: 180,
@@ -61,7 +58,6 @@ const initialExercises: Exercise[] = [
   {
     id: 'cable-fly',
     name: 'CABLE FLY',
-    equipment: "Station A · Gold's Gym",
     repRange: '10–15 reps',
     lastPerformance: 'Last: 35 lb × 14, 12, 11',
     restSeconds: 120,
@@ -70,7 +66,6 @@ const initialExercises: Exercise[] = [
   {
     id: 'lateral-raise',
     name: 'LATERAL RAISE',
-    equipment: "Machine #7 · Gold's Gym",
     repRange: '12–20 reps',
     lastPerformance: 'Last: 60 lb × 15, 13, 12',
     restSeconds: 120,
@@ -79,7 +74,6 @@ const initialExercises: Exercise[] = [
   {
     id: 'tricep-pushdown',
     name: 'TRICEP PUSHDOWN',
-    equipment: "Station B · Gold's Gym",
     repRange: '10–15 reps',
     lastPerformance: 'Last: 130 lb × 12, 11, 10',
     restSeconds: 120,
@@ -88,7 +82,6 @@ const initialExercises: Exercise[] = [
   {
     id: 'overhead-extension',
     name: 'OVERHEAD EXTENSION',
-    equipment: "Cable #4 · Gold's Gym",
     repRange: '10–15 reps',
     lastPerformance: 'Last: 50 lb × 14, 12, 11',
     restSeconds: 120,
@@ -102,6 +95,13 @@ function formatTimer(totalSeconds: number) {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+function getExerciseStatus(exercise: Exercise) {
+  const completed = exercise.sets.filter((set) => set.complete).length;
+  if (completed === 0) return 'NOT STARTED';
+  if (completed === exercise.sets.length) return 'COMPLETED';
+  return 'IN PROGRESS';
+}
+
 export default function WorkoutScreen() {
   const router = useRouter();
   const [exercises, setExercises] = useState(initialExercises);
@@ -111,17 +111,6 @@ export default function WorkoutScreen() {
   const [showReview, setShowReview] = useState(false);
 
   const exercise = exercises[activeIndex];
-  const completedSets = useMemo(
-    () => exercises.reduce(
-      (total, item) => total + item.sets.filter((set) => set.complete).length,
-      0,
-    ),
-    [exercises],
-  );
-  const totalSets = useMemo(
-    () => exercises.reduce((total, item) => total + item.sets.length, 0),
-    [exercises],
-  );
 
   useEffect(() => {
     if (restRemaining === null || restRemaining <= 0) return;
@@ -230,13 +219,10 @@ export default function WorkoutScreen() {
       <ScrollView style={styles.screen} contentContainerStyle={styles.page}>
         <Text style={styles.eyebrow}>WORKOUT REVIEW</Text>
         <Text style={styles.screenTitle}>PUSH DAY</Text>
-        <Text style={styles.summary}>
-          {completedSets} of {totalSets} sets completed
-        </Text>
 
         <View style={styles.overviewList}>
           {exercises.map((item, index) => {
-            const done = item.sets.filter((set) => set.complete).length;
+            const status = getExerciseStatus(item);
             return (
               <Pressable
                 key={item.id}
@@ -247,10 +233,9 @@ export default function WorkoutScreen() {
                 </View>
                 <View style={styles.overviewInfo}>
                   <Text style={styles.overviewName}>{item.name}</Text>
-                  <Text style={styles.overviewMeta}>{done} / {item.sets.length} sets</Text>
                 </View>
-                <Text style={done === item.sets.length ? styles.doneMark : styles.pendingMark}>
-                  {done === item.sets.length ? '✓' : 'EDIT'}
+                <Text style={status === 'COMPLETED' ? styles.doneStatus : styles.pendingStatus}>
+                  {status}
                 </Text>
               </Pressable>
             );
@@ -272,18 +257,16 @@ export default function WorkoutScreen() {
       <ScrollView style={styles.screen} contentContainerStyle={styles.page}>
         <View style={styles.topBar}>
           <View>
-            <Text style={styles.eyebrow}>PUSH DAY</Text>
-            <Text style={styles.screenTitle}>WORKOUT</Text>
+            <Text style={styles.eyebrow}>WORKOUT</Text>
+            <Text style={styles.screenTitle}>PUSH DAY</Text>
           </View>
           <Pressable onPress={() => setShowOverview(false)} style={styles.closeButton}>
             <Text style={styles.closeButtonText}>CLOSE</Text>
           </Pressable>
         </View>
-        <Text style={styles.summary}>{completedSets} of {totalSets} sets completed</Text>
-
         <View style={styles.overviewList}>
           {exercises.map((item, index) => {
-            const done = item.sets.filter((set) => set.complete).length;
+            const status = getExerciseStatus(item);
             return (
               <Pressable
                 key={item.id}
@@ -294,10 +277,9 @@ export default function WorkoutScreen() {
                 </View>
                 <View style={styles.overviewInfo}>
                   <Text style={styles.overviewName}>{item.name}</Text>
-                  <Text style={styles.overviewMeta}>{done} / {item.sets.length} sets</Text>
                 </View>
-                <Text style={done === item.sets.length ? styles.doneMark : styles.pendingMark}>
-                  {done === item.sets.length ? '✓' : 'OPEN'}
+                <Text style={status === 'COMPLETED' ? styles.doneStatus : styles.pendingStatus}>
+                  {status}
                 </Text>
               </Pressable>
             );
@@ -319,7 +301,8 @@ export default function WorkoutScreen() {
       contentContainerStyle={styles.page}>
       <View style={styles.topBar}>
         <View>
-          <Text style={styles.eyebrow}>PUSH DAY · 00:24:18</Text>
+          <Text style={styles.eyebrow}>WORKOUT</Text>
+          <Text style={styles.screenTitle}>PUSH DAY</Text>
           <Text style={styles.progressText}>EXERCISE {activeIndex + 1} OF {exercises.length}</Text>
         </View>
         <Pressable onPress={() => setShowOverview(true)} style={styles.overviewButton}>
@@ -350,7 +333,6 @@ export default function WorkoutScreen() {
 
       <View style={styles.exerciseHeader}>
         <Text style={styles.exerciseName}>{exercise.name}</Text>
-        <Text style={styles.equipment}>{exercise.equipment}</Text>
         <View style={styles.exerciseMetaRow}>
           <Text style={styles.repRange}>{exercise.sets.length} SETS · {exercise.repRange.toUpperCase()}</Text>
           <Text style={styles.restDefault}>REST {formatTimer(exercise.restSeconds)}</Text>
@@ -482,7 +464,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   exerciseName: { color: colors.text, fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
-  equipment: { color: colors.textMuted, fontSize: 12 },
   exerciseMetaRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   repRange: { color: colors.accent, fontSize: 9, fontWeight: '700', letterSpacing: 1.2 },
   restDefault: { color: colors.textMuted, fontSize: 9, letterSpacing: 1 },
@@ -571,7 +552,6 @@ const styles = StyleSheet.create({
   nextText: { color: colors.text, fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
   disabled: { opacity: 0.3 },
   prototypeNote: { color: colors.textMuted, fontSize: 10, textAlign: 'center' },
-  summary: { color: colors.textMuted, fontSize: 13 },
   overviewList: { gap: spacing.sm },
   overviewRow: {
     minHeight: 68,
@@ -594,9 +574,8 @@ const styles = StyleSheet.create({
   overviewNumberText: { color: colors.textMuted, fontSize: 11, fontWeight: '700' },
   overviewInfo: { flex: 1, minWidth: 0 },
   overviewName: { color: colors.text, fontSize: 14, fontWeight: '800' },
-  overviewMeta: { color: colors.textMuted, fontSize: 10, marginTop: 4 },
-  doneMark: { color: colors.accent, fontSize: 18, fontWeight: '900' },
-  pendingMark: { color: colors.textMuted, fontSize: 9, fontWeight: '700', letterSpacing: 1 },
+  doneStatus: { color: colors.text, fontSize: 9, fontWeight: '800', letterSpacing: 1 },
+  pendingStatus: { color: colors.textMuted, fontSize: 9, fontWeight: '700', letterSpacing: 1 },
   primaryButton: {
     minHeight: 58,
     backgroundColor: colors.accent,
