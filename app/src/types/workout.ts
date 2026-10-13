@@ -6,7 +6,7 @@ export type WorkoutStatus = 'draft' | 'completed' | 'abandoned';
 
 export type ExerciseStatus = 'NOT STARTED' | 'IN PROGRESS' | 'COMPLETED';
 
-export type WorkoutSetField = 'weight' | 'reps' | 'rir';
+export type WorkoutSetField = 'weight' | 'reps' | 'seconds' | 'rir';
 
 export type PlannedExercise = {
   id: EntityId;
@@ -37,6 +37,7 @@ export type WorkoutSet = {
   id: number;
   weight: string;
   reps: string;
+  seconds: string;
   rir: string;
   complete: boolean;
 };
@@ -45,6 +46,7 @@ export type WorkoutExercise = {
   id: EntityId;
   name: string;
   repRange: string;
+  targetUnit: TargetUnit;
   lastPerformance: string;
   restSeconds: number;
   sets: WorkoutSet[];

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Pressable,
@@ -14,68 +15,10 @@ import {
 import * as Haptics from 'expo-haptics';
 
 import { colors, spacing, typography } from '@/constants/theme';
-import type { WorkoutExercise, WorkoutSet, WorkoutSetField } from '@/types/workout';
+import { workoutRepository } from '@/repositories';
+import type { WorkoutExercise, WorkoutSession, WorkoutSet, WorkoutSetField } from '@/types/workout';
 
 
-const makeSets = (count: number): WorkoutSet[] =>
-  Array.from({ length: count }, (_, index) => ({
-    id: index + 1,
-    weight: '',
-    reps: '',
-    rir: '',
-    complete: false,
-  }));
-
-const initialExercises: WorkoutExercise[] = [
-  {
-    id: 'incline-press',
-    name: 'INCLINE CHEST PRESS',
-    repRange: '8–12 reps',
-    lastPerformance: 'Last: 185 lb × 8, 8, 7',
-    restSeconds: 180,
-    sets: makeSets(3),
-  },
-  {
-    id: 'shoulder-press',
-    name: 'SHOULDER PRESS',
-    repRange: '6–10 reps',
-    lastPerformance: 'Last: 90 lb × 10, 9, 8',
-    restSeconds: 180,
-    sets: makeSets(3),
-  },
-  {
-    id: 'cable-fly',
-    name: 'CABLE FLY',
-    repRange: '10–15 reps',
-    lastPerformance: 'Last: 35 lb × 14, 12, 11',
-    restSeconds: 120,
-    sets: makeSets(3),
-  },
-  {
-    id: 'lateral-raise',
-    name: 'LATERAL RAISE',
-    repRange: '12–20 reps',
-    lastPerformance: 'Last: 60 lb × 15, 13, 12',
-    restSeconds: 120,
-    sets: makeSets(3),
-  },
-  {
-    id: 'tricep-pushdown',
-    name: 'TRICEP PUSHDOWN',
-    repRange: '10–15 reps',
-    lastPerformance: 'Last: 130 lb × 12, 11, 10',
-    restSeconds: 120,
-    sets: makeSets(3),
-  },
-  {
-    id: 'overhead-extension',
-    name: 'OVERHEAD EXTENSION',
-    repRange: '10–15 reps',
-    lastPerformance: 'Last: 50 lb × 14, 12, 11',
-    restSeconds: 120,
-    sets: makeSets(3),
-  },
-];
 
 function formatTimer(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
@@ -91,6 +34,7 @@ function getExerciseStatus(exercise: WorkoutExercise) {
 }
 
 function hasPersonalRecord(exercise: WorkoutExercise) {
+  if (exercise.targetUnit === 'SEC') return false;
   const previousBest = Number(exercise.lastPerformance.match(/([0-9.]+) lb/i)?.[1] ?? 0);
   return exercise.sets.some(
     (set) => set.complete && Number(set.weight) > previousBest,
@@ -99,21 +43,71 @@ function hasPersonalRecord(exercise: WorkoutExercise) {
 
 export default function WorkoutScreen() {
   const router = useRouter();
-  const [exercises, setExercises] = useState(initialExercises);
+  const { sessionId } = useLocalSearchParams<{ sessionId?: string }>();
+  const [session, setSession] = useState<WorkoutSession | null>(null);
+  const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [restRemaining, setRestRemaining] = useState<number | null>(null);
   const [showOverview, setShowOverview] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [animatedSetKey, setAnimatedSetKey] = useState<string | null>(null);
   const [reviewDuration, setReviewDuration] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const checkScale = useRef(new Animated.Value(1)).current;
   const workoutStartedAt = useRef(Date.now());
 
   const exercise = exercises[activeIndex];
+  const isTimedExercise = exercise?.targetUnit === 'SEC';
   const completedExerciseCount = exercises.filter(
     (item) => getExerciseStatus(item) === 'COMPLETED',
   ).length;
   const personalRecordCount = exercises.filter(hasPersonalRecord).length;
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadWorkout() {
+      try {
+        let savedSession = typeof sessionId === 'string'
+          ? await workoutRepository.getWorkout(sessionId)
+          : await workoutRepository.getDraftWorkout();
+
+        if (
+          savedSession &&
+          savedSession.exercises.length === 0 &&
+          savedSession.splitDayId
+        ) {
+          savedSession = await workoutRepository.startWorkout(savedSession.splitDayId);
+        }
+
+        if (!savedSession) {
+          const split = await workoutRepository.getActiveSplit();
+          const nextDay = split?.days[split.nextDayIndex] ?? split?.days[0];
+          if (nextDay) savedSession = await workoutRepository.startWorkout(nextDay.id);
+        }
+
+        if (!active) return;
+        if (!savedSession) {
+          setLoadError('No workout is ready to start.');
+          return;
+        }
+
+        setSession(savedSession);
+        setExercises(savedSession.exercises);
+        workoutStartedAt.current = new Date(savedSession.startedAt).getTime();
+      } catch {
+        if (active) setLoadError('Could not load this workout.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void loadWorkout();
+    return () => {
+      active = false;
+    };
+  }, [sessionId]);
 
   useEffect(() => {
     if (restRemaining === null || restRemaining <= 0) return;
@@ -127,37 +121,54 @@ export default function WorkoutScreen() {
   }, [restRemaining]);
 
   function updateSet(setId: number, field: WorkoutSetField, value: string) {
+    if (!exercise) return;
+    const currentSet = exercise.sets.find((set) => set.id === setId);
+    if (!currentSet) return;
+
+    const nextSet = { ...currentSet, [field]: value, complete: false };
     setExercises((current) => current.map((item, index) => (
       index !== activeIndex
         ? item
         : {
             ...item,
-            sets: item.sets.map((set) => (
-              set.id === setId ? { ...set, [field]: value, complete: false } : set
-            )),
+            sets: item.sets.map((set) => set.id === setId ? nextSet : set),
           }
     )));
+
+    if (session) {
+      void workoutRepository.saveWorkoutSet(session.id, exercise.id, nextSet);
+    }
   }
 
   function toggleSet(setId: number) {
     const target = exercise.sets.find((set) => set.id === setId);
     if (!target) return;
 
-    if (!target.complete && (!target.weight || !target.reps || !target.rir)) {
-      Alert.alert('Complete the set', 'Enter weight, reps, and RIR before marking this set done.');
+    const missingTimedValue = isTimedExercise && !target.seconds;
+    const missingStrengthValue = !isTimedExercise && (!target.weight || !target.reps || !target.rir);
+    if (!target.complete && (missingTimedValue || missingStrengthValue)) {
+      Alert.alert(
+        'Complete the set',
+        isTimedExercise
+          ? 'Enter the completed seconds before marking this set done.'
+          : 'Enter weight, reps, and RIR before marking this set done.',
+      );
       return;
     }
 
+    const nextSet = { ...target, complete: !target.complete };
     setExercises((current) => current.map((item, index) => (
       index !== activeIndex
         ? item
         : {
             ...item,
-            sets: item.sets.map((set) => (
-              set.id === setId ? { ...set, complete: !set.complete } : set
-            )),
+            sets: item.sets.map((set) => set.id === setId ? nextSet : set),
           }
     )));
+
+    if (session) {
+      void workoutRepository.saveWorkoutSet(session.id, exercise.id, nextSet);
+    }
 
     if (!target.complete) {
       const setKey = exercise.id + '-' + setId;
@@ -175,23 +186,25 @@ export default function WorkoutScreen() {
   }
 
   function addSet() {
+    if (!exercise) return;
+    const nextSet: WorkoutSet = {
+      id: Math.max(0, ...exercise.sets.map((set) => set.id)) + 1,
+      weight: '',
+      reps: '',
+      seconds: '',
+      rir: '',
+      complete: false,
+    };
+
     setExercises((current) => current.map((item, index) => (
       index !== activeIndex
         ? item
-        : {
-            ...item,
-            sets: [
-              ...item.sets,
-              {
-                id: Math.max(...item.sets.map((set) => set.id)) + 1,
-                weight: '',
-                reps: '',
-                rir: '',
-                complete: false,
-              },
-            ],
-          }
+        : { ...item, sets: [...item.sets, nextSet] }
     )));
+
+    if (session) {
+      void workoutRepository.saveWorkoutSet(session.id, exercise.id, nextSet);
+    }
   }
 
   function openCompletion() {
@@ -233,18 +246,42 @@ export default function WorkoutScreen() {
     setShowReview(false);
   }
 
-  function saveWorkout() {
-    Alert.alert('Workout saved', 'Push Day complete.', [
-      { text: 'Done', onPress: () => router.replace('/') },
-    ]);
+  async function saveWorkout() {
+    if (!session) return;
+
+    try {
+      const completed = await workoutRepository.finishWorkout(session.id);
+      setSession(completed);
+      Alert.alert('Workout saved', completed.workoutName + ' complete.', [
+        { text: 'Done', onPress: () => router.replace('/') },
+      ]);
+    } catch {
+      Alert.alert('Could not save workout', 'Please try again.');
+    }
+  }
+
+  if (loading) {
+    return (
+      <View style={styles.centerState}>
+        <ActivityIndicator color={colors.accent} />
+      </View>
+    );
+  }
+
+  if (loadError || !session || !exercise) {
+    return (
+      <View style={styles.centerState}>
+        <Text style={styles.errorText}>{loadError ?? 'No workout exercises found.'}</Text>
+      </View>
+    );
   }
 
   if (showReview) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.page}>
         <Text style={styles.eyebrow}>WORKOUT COMPLETE</Text>
-        <Text style={styles.screenTitle}>PUSH DAY</Text>
-        <Text style={styles.completionMessage}>Push Day complete.</Text>
+        <Text style={styles.screenTitle}>{session.workoutName}</Text>
+        <Text style={styles.completionMessage}>{session.workoutName} complete.</Text>
 
         <View style={styles.completionStats}>
           <View style={styles.completionStat}>
@@ -299,7 +336,7 @@ export default function WorkoutScreen() {
         <View style={styles.topBar}>
           <View>
             <Text style={styles.eyebrow}>WORKOUT</Text>
-            <Text style={styles.screenTitle}>PUSH DAY</Text>
+            <Text style={styles.screenTitle}>{session.workoutName}</Text>
           </View>
           <Pressable onPress={() => setShowOverview(false)} style={styles.closeButton}>
             <Text style={styles.closeButtonText}>CLOSE</Text>
@@ -343,7 +380,7 @@ export default function WorkoutScreen() {
       <View style={styles.topBar}>
         <View>
           <Text style={styles.eyebrow}>WORKOUT</Text>
-          <Text style={styles.screenTitle}>PUSH DAY</Text>
+          <Text style={styles.screenTitle}>{session.workoutName}</Text>
           <Text style={styles.progressText}>EXERCISE {activeIndex + 1} OF {exercises.length}</Text>
         </View>
         <Pressable onPress={() => setShowOverview(true)} style={styles.overviewButton}>
@@ -384,42 +421,62 @@ export default function WorkoutScreen() {
       <View style={styles.setTable}>
         <View style={styles.tableHeader}>
           <Text style={[styles.columnLabel, styles.setColumn]}>SET</Text>
-          <Text style={styles.columnLabel}>WEIGHT</Text>
-          <Text style={styles.columnLabel}>REPS</Text>
-          <Text style={styles.columnLabel}>RIR</Text>
+          {isTimedExercise ? (
+            <Text style={styles.columnLabel}>SECONDS</Text>
+          ) : (
+            <>
+              <Text style={styles.columnLabel}>WEIGHT</Text>
+              <Text style={styles.columnLabel}>REPS</Text>
+              <Text style={styles.columnLabel}>RIR</Text>
+            </>
+          )}
           <View style={styles.doneColumn} />
         </View>
 
         {exercise.sets.map((set, index) => (
           <View key={set.id} style={[styles.setRow, set.complete && styles.setRowComplete]}>
             <Text style={[styles.setNumber, styles.setColumn]}>{String(index + 1).padStart(2, '0')}</Text>
-            <TextInput
-              accessibilityLabel={`Set ${index + 1} weight`}
-              keyboardType="decimal-pad"
-              placeholder="—"
-              placeholderTextColor={colors.textSubtle}
-              value={set.weight}
-              onChangeText={(value) => updateSet(set.id, 'weight', value)}
-              style={styles.input}
-            />
-            <TextInput
-              accessibilityLabel={`Set ${index + 1} reps`}
-              keyboardType="number-pad"
-              placeholder="—"
-              placeholderTextColor={colors.textSubtle}
-              value={set.reps}
-              onChangeText={(value) => updateSet(set.id, 'reps', value)}
-              style={styles.input}
-            />
-            <TextInput
-              accessibilityLabel={`Set ${index + 1} RIR`}
-              keyboardType="number-pad"
-              placeholder="—"
-              placeholderTextColor={colors.textSubtle}
-              value={set.rir}
-              onChangeText={(value) => updateSet(set.id, 'rir', value)}
-              style={styles.input}
-            />
+            {isTimedExercise ? (
+              <TextInput
+                accessibilityLabel={'Set ' + (index + 1) + ' seconds'}
+                keyboardType="number-pad"
+                placeholder="—"
+                placeholderTextColor={colors.textSubtle}
+                value={set.seconds}
+                onChangeText={(value) => updateSet(set.id, 'seconds', value)}
+                style={styles.input}
+              />
+            ) : (
+              <>
+                <TextInput
+                  accessibilityLabel={'Set ' + (index + 1) + ' weight'}
+                  keyboardType="decimal-pad"
+                  placeholder="—"
+                  placeholderTextColor={colors.textSubtle}
+                  value={set.weight}
+                  onChangeText={(value) => updateSet(set.id, 'weight', value)}
+                  style={styles.input}
+                />
+                <TextInput
+                  accessibilityLabel={'Set ' + (index + 1) + ' reps'}
+                  keyboardType="number-pad"
+                  placeholder="—"
+                  placeholderTextColor={colors.textSubtle}
+                  value={set.reps}
+                  onChangeText={(value) => updateSet(set.id, 'reps', value)}
+                  style={styles.input}
+                />
+                <TextInput
+                  accessibilityLabel={'Set ' + (index + 1) + ' RIR'}
+                  keyboardType="number-pad"
+                  placeholder="—"
+                  placeholderTextColor={colors.textSubtle}
+                  value={set.rir}
+                  onChangeText={(value) => updateSet(set.id, 'rir', value)}
+                  style={styles.input}
+                />
+              </>
+            )}
             <Animated.View
               style={animatedSetKey === exercise.id + '-' + set.id
                 ? { transform: [{ scale: checkScale }] }
@@ -464,6 +521,8 @@ export default function WorkoutScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  centerState: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  errorText: { color: colors.textMuted, fontSize: 13, textAlign: 'center' },
   page: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,

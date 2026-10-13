@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { colors, spacing } from '@/constants/theme';
-import type { PlannedExercise, SplitDay } from '@/types/workout';
+import { workoutRepository } from '@/repositories';
+import type { PlannedExercise, SplitDay, WorkoutSplit } from '@/types/workout';
 
 
 const palette = [
@@ -16,43 +17,59 @@ const palette = [
   { name: 'Pink', color: '#FF5C9A' },
 ];
 
-const starterDays: SplitDay[] = [
-  {
-    id: 'push', name: 'PUSH DAY', workoutDay: 'MONDAY',
-    color: palette[0].color,
-    exercises: [
-      { id: 'bench', name: 'Incline Bench Press', sets: '3', target: '6–8', unit: 'REPS', pr: '195 LB × 6' },
-      { id: 'press', name: 'Machine Chest Press', sets: '3', target: '8–10', unit: 'REPS', pr: '160 LB × 8' },
-      { id: 'raise', name: 'Cable Lateral Raise', sets: '3', target: '10–15', unit: 'REPS', pr: '30 LB × 12' },
-    ],
-  },
-  {
-    id: 'pull', name: 'PULL DAY', workoutDay: 'TUESDAY',
-    color: palette[5].color,
-    exercises: [
-      { id: 'pulldown', name: 'Lat Pulldown', sets: '3', target: '6–10', unit: 'REPS', pr: '150 LB × 8' },
-      { id: 'row', name: 'Chest-Supported Row', sets: '3', target: '8–12', unit: 'REPS', pr: '135 LB × 10' },
-      { id: 'curl', name: 'Preacher Curl', sets: '3', target: '8–12', unit: 'REPS', pr: '65 LB × 9' },
-    ],
-  },
-  {
-    id: 'legs', name: 'LEGS DAY', workoutDay: 'WEDNESDAY',
-    color: palette[4].color,
-    exercises: [
-      { id: 'squat', name: 'Hack Squat', sets: '4', target: '6–10', unit: 'REPS', pr: '270 LB × 7' },
-      { id: 'leg-curl', name: 'Seated Leg Curl', sets: '3', target: '8–12', unit: 'REPS', pr: '120 LB × 10' },
-      { id: 'calf', name: 'Standing Calf Raise', sets: '4', target: '10–15', unit: 'REPS', pr: '180 LB × 12' },
-    ],
-  },
-];
-
 const makeId = (prefix: string) => prefix + '-' + Date.now() + '-' + Math.random().toString(16).slice(2);
 
 export default function SplitsScreen() {
   const router = useRouter();
-  const [days, setDays] = useState(starterDays);
-  const [expandedId, setExpandedId] = useState<string | null>('push');
+  const [split, setSplit] = useState<WorkoutSplit | null>(null);
+  const [days, setDays] = useState<SplitDay[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    workoutRepository.getActiveSplit()
+      .then((savedSplit) => {
+        if (!active) return;
+        setSplit(savedSplit);
+        setDays(savedSplit?.days ?? []);
+        setExpandedId(savedSplit?.days[0]?.id ?? null);
+      })
+      .catch(() => {
+        if (active) setLoadError('Could not load workout splits.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function saveDays(nextDays: SplitDay[]) {
+    setDays(nextDays);
+    if (!split) return;
+
+    const savedSplit = await workoutRepository.saveActiveSplit({
+      ...split,
+      days: nextDays,
+    });
+    setSplit(savedSplit);
+    setDays(savedSplit.days);
+  }
+
+  async function startWorkout(splitDayId: string) {
+    try {
+      const session = await workoutRepository.startWorkout(splitDayId);
+      router.push({ pathname: '/workout', params: { sessionId: session.id } });
+    } catch {
+      Alert.alert('Could not start workout', 'Please try again.');
+    }
+  }
 
   const updateDay = (id: string, changes: Partial<SplitDay>) =>
     setDays((current) => current.map((day) => day.id === id ? { ...day, ...changes } : day));
@@ -76,9 +93,10 @@ export default function SplitsScreen() {
   function addDay() {
     const option = palette[days.length % palette.length];
     const id = makeId('day');
-    setDays((current) => [...current, {
+    const nextDays = [...days, {
       id, name: 'NEW DAY', workoutDay: 'THURSDAY', color: option.color, exercises: [],
-    }]);
+    }];
+    void saveDays(nextDays);
     setExpandedId(id);
     setEditingId(id);
   }
@@ -87,11 +105,30 @@ export default function SplitsScreen() {
     Alert.alert('Delete split day?', 'This removes the day and its planned exercises.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => {
-        setDays((current) => current.filter((day) => day.id !== id));
+        const nextDays = days.filter((day) => day.id !== id);
+        if (split) void workoutRepository.deleteSplitDay(split.id, id);
+        setDays(nextDays);
+        setSplit((current) => current ? { ...current, days: nextDays } : current);
         setExpandedId((current) => current === id ? null : current);
         setEditingId((current) => current === id ? null : current);
       } },
     ]);
+  }
+
+  if (loading) {
+    return (
+      <View style={styles.centerState}>
+        <ActivityIndicator color={colors.accent} />
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={styles.centerState}>
+        <Text style={styles.errorText}>{loadError}</Text>
+      </View>
+    );
   }
 
   return (
@@ -126,7 +163,11 @@ export default function SplitsScreen() {
                   <Text style={styles.count}>{day.exercises.length} {day.exercises.length === 1 ? 'exercise' : 'exercises'}</Text>
                 </Pressable>
                 <View style={styles.headerActions}>
-                  <Pressable onPress={() => { setEditingId(editing ? null : day.id); setExpandedId(day.id); }}
+                  <Pressable onPress={() => {
+                      if (editing) void saveDays(days);
+                      setEditingId(editing ? null : day.id);
+                      setExpandedId(day.id);
+                    }}
                     style={[styles.editButton, editing && styles.editButtonActive]}>
                     <Text style={[styles.editText, editing && styles.editTextActive]}>{editing ? 'DONE' : 'EDIT'}</Text>
                   </Pressable>
@@ -181,7 +222,7 @@ export default function SplitsScreen() {
                     <Text style={styles.outlineText}>＋ ADD EXERCISE</Text>
                   </Pressable>
                   <Pressable onPress={() => deleteDay(day.id)} style={styles.deleteButton}><Text style={styles.deleteText}>DELETE DAY</Text></Pressable>
-                </View> : day.exercises.length > 0 && <Pressable onPress={() => router.push('/workout')}
+                </View> : day.exercises.length > 0 && <Pressable onPress={() => void startWorkout(day.id)}
                   style={styles.startButton}><Text style={styles.startText}>START THIS DAY</Text></Pressable>}
               </View>}
             </View>
@@ -196,6 +237,8 @@ export default function SplitsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  centerState: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  errorText: { color: colors.textMuted, fontSize: 13, textAlign: 'center' },
   page: { paddingHorizontal: spacing.xl, paddingTop: spacing.xl, paddingBottom: 64, gap: spacing.xl, backgroundColor: colors.background },
   pageTitle: { color: colors.text, fontSize: 34, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
   dayList: { gap: spacing.lg },
