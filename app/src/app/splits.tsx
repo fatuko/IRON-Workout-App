@@ -3,16 +3,8 @@ import { useRouter } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { colors, spacing } from '@/constants/theme';
+import type { PlannedExercise, SplitDay } from '@/types/workout';
 
-type TargetUnit = 'REPS' | 'SEC';
-type Exercise = { id: string; name: string; sets: string; target: string; unit: TargetUnit; pr: string };
-type SplitDay = {
-  id: string;
-  name: string;
-  workoutDay: string;
-  color: string;
-  exercises: Exercise[];
-};
 
 const palette = [
   { name: 'Red', color: '#FF3D00' },
@@ -65,7 +57,7 @@ export default function SplitsScreen() {
   const updateDay = (id: string, changes: Partial<SplitDay>) =>
     setDays((current) => current.map((day) => day.id === id ? { ...day, ...changes } : day));
 
-  const updateExercise = (dayId: string, exerciseId: string, changes: Partial<Exercise>) =>
+  const updateExercise = (dayId: string, exerciseId: string, changes: Partial<PlannedExercise>) =>
     setDays((current) => current.map((day) => day.id === dayId ? {
       ...day,
       exercises: day.exercises.map((exercise) => exercise.id === exerciseId ? { ...exercise, ...changes } : exercise),

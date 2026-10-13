@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import {
   Alert,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,24 +11,11 @@ import {
   View,
 } from 'react-native';
 
-import { colors, spacing, typography } from '@/constants/theme';
+import * as Haptics from 'expo-haptics';
 
-type SetField = 'weight' | 'reps' | 'rir';
-type WorkoutSet = {
-  id: number;
-  weight: string;
-  reps: string;
-  rir: string;
-  complete: boolean;
-};
-type Exercise = {
-  id: string;
-  name: string;
-  repRange: string;
-  lastPerformance: string;
-  restSeconds: number;
-  sets: WorkoutSet[];
-};
+import { colors, spacing, typography } from '@/constants/theme';
+import type { WorkoutExercise, WorkoutSet, WorkoutSetField } from '@/types/workout';
+
 
 const makeSets = (count: number): WorkoutSet[] =>
   Array.from({ length: count }, (_, index) => ({
@@ -38,7 +26,7 @@ const makeSets = (count: number): WorkoutSet[] =>
     complete: false,
   }));
 
-const initialExercises: Exercise[] = [
+const initialExercises: WorkoutExercise[] = [
   {
     id: 'incline-press',
     name: 'INCLINE CHEST PRESS',
@@ -95,11 +83,18 @@ function formatTimer(totalSeconds: number) {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
-function getExerciseStatus(exercise: Exercise) {
+function getExerciseStatus(exercise: WorkoutExercise) {
   const completed = exercise.sets.filter((set) => set.complete).length;
   if (completed === 0) return 'NOT STARTED';
   if (completed === exercise.sets.length) return 'COMPLETED';
   return 'IN PROGRESS';
+}
+
+function hasPersonalRecord(exercise: WorkoutExercise) {
+  const previousBest = Number(exercise.lastPerformance.match(/([0-9.]+) lb/i)?.[1] ?? 0);
+  return exercise.sets.some(
+    (set) => set.complete && Number(set.weight) > previousBest,
+  );
 }
 
 export default function WorkoutScreen() {
@@ -109,8 +104,16 @@ export default function WorkoutScreen() {
   const [restRemaining, setRestRemaining] = useState<number | null>(null);
   const [showOverview, setShowOverview] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [animatedSetKey, setAnimatedSetKey] = useState<string | null>(null);
+  const [reviewDuration, setReviewDuration] = useState<number | null>(null);
+  const checkScale = useRef(new Animated.Value(1)).current;
+  const workoutStartedAt = useRef(Date.now());
 
   const exercise = exercises[activeIndex];
+  const completedExerciseCount = exercises.filter(
+    (item) => getExerciseStatus(item) === 'COMPLETED',
+  ).length;
+  const personalRecordCount = exercises.filter(hasPersonalRecord).length;
 
   useEffect(() => {
     if (restRemaining === null || restRemaining <= 0) return;
@@ -123,7 +126,7 @@ export default function WorkoutScreen() {
     return () => clearInterval(timer);
   }, [restRemaining]);
 
-  function updateSet(setId: number, field: SetField, value: string) {
+  function updateSet(setId: number, field: WorkoutSetField, value: string) {
     setExercises((current) => current.map((item, index) => (
       index !== activeIndex
         ? item
@@ -156,7 +159,19 @@ export default function WorkoutScreen() {
           }
     )));
 
-    if (!target.complete) setRestRemaining(exercise.restSeconds);
+    if (!target.complete) {
+      const setKey = exercise.id + '-' + setId;
+      setAnimatedSetKey(setKey);
+      checkScale.setValue(0.55);
+      Animated.spring(checkScale, {
+        toValue: 1,
+        friction: 4,
+        tension: 180,
+        useNativeDriver: true,
+      }).start(() => setAnimatedSetKey(null));
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setRestRemaining(exercise.restSeconds);
+    }
   }
 
   function addSet() {
@@ -179,11 +194,21 @@ export default function WorkoutScreen() {
     )));
   }
 
+  function openCompletion() {
+    setReviewDuration((current) => (
+      current ?? Math.max(1, Math.floor((Date.now() - workoutStartedAt.current) / 1000))
+    ));
+    setRestRemaining(null);
+    setShowOverview(false);
+    setShowReview(true);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
   function advanceExercise() {
     const hasIncompleteSets = exercise.sets.some((set) => !set.complete);
     const advance = () => {
       setRestRemaining(null);
-      if (activeIndex === exercises.length - 1) setShowReview(true);
+      if (activeIndex === exercises.length - 1) openCompletion();
       else setActiveIndex((index) => index + 1);
     };
 
@@ -209,7 +234,7 @@ export default function WorkoutScreen() {
   }
 
   function saveWorkout() {
-    Alert.alert('Workout saved', 'Supabase persistence will replace this prototype action.', [
+    Alert.alert('Workout saved', 'Push Day complete.', [
       { text: 'Done', onPress: () => router.replace('/') },
     ]);
   }
@@ -217,8 +242,24 @@ export default function WorkoutScreen() {
   if (showReview) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.page}>
-        <Text style={styles.eyebrow}>WORKOUT REVIEW</Text>
+        <Text style={styles.eyebrow}>WORKOUT COMPLETE</Text>
         <Text style={styles.screenTitle}>PUSH DAY</Text>
+        <Text style={styles.completionMessage}>Push Day complete.</Text>
+
+        <View style={styles.completionStats}>
+          <View style={styles.completionStat}>
+            <Text style={styles.completionValue}>{formatTimer(reviewDuration ?? 0)}</Text>
+            <Text style={styles.completionLabel}>DURATION</Text>
+          </View>
+          <View style={styles.completionStat}>
+            <Text style={styles.completionValue}>{completedExerciseCount}</Text>
+            <Text style={styles.completionLabel}>EXERCISES</Text>
+          </View>
+          <View style={styles.completionStat}>
+            <Text style={styles.completionValue}>{personalRecordCount}</Text>
+            <Text style={styles.completionLabel}>PRS</Text>
+          </View>
+        </View>
 
         <View style={styles.overviewList}>
           {exercises.map((item, index) => {
@@ -286,7 +327,7 @@ export default function WorkoutScreen() {
           })}
         </View>
 
-        <Pressable onPress={() => setShowReview(true)} style={styles.outlineButton}>
+        <Pressable onPress={openCompletion} style={styles.outlineButton}>
           <Text style={styles.outlineButtonText}>FINISH WORKOUT</Text>
         </Pressable>
       </ScrollView>
@@ -379,14 +420,19 @@ export default function WorkoutScreen() {
               onChangeText={(value) => updateSet(set.id, 'rir', value)}
               style={styles.input}
             />
-            <Pressable
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: set.complete }}
-              accessibilityLabel={`Complete set ${index + 1}`}
-              onPress={() => toggleSet(set.id)}
-              style={[styles.checkButton, set.complete && styles.checkButtonComplete]}>
-              <Text style={styles.checkButtonText}>{set.complete ? '✓' : ''}</Text>
-            </Pressable>
+            <Animated.View
+              style={animatedSetKey === exercise.id + '-' + set.id
+                ? { transform: [{ scale: checkScale }] }
+                : undefined}>
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: set.complete }}
+                accessibilityLabel={'Complete set ' + (index + 1)}
+                onPress={() => toggleSet(set.id)}
+                style={[styles.checkButton, set.complete && styles.checkButtonComplete]}>
+                <Text style={styles.checkButtonText}>{set.complete ? '✓' : ''}</Text>
+              </Pressable>
+            </Animated.View>
           </View>
         ))}
       </View>
@@ -412,7 +458,6 @@ export default function WorkoutScreen() {
         </Pressable>
       </View>
 
-      <Text style={styles.prototypeNote}>Draft data is stored in memory for this prototype.</Text>
     </ScrollView>
   );
 }
@@ -430,6 +475,20 @@ const styles = StyleSheet.create({
   eyebrow: typography.eyebrow,
   screenTitle: { color: colors.text, fontSize: 35, fontWeight: '900', marginTop: 4 },
   progressText: { color: colors.text, fontSize: 19, fontWeight: '900', marginTop: 5 },
+  completionMessage: { color: colors.textMuted, fontSize: 13, marginTop: -spacing.md },
+  completionStats: { flexDirection: 'row', gap: spacing.sm },
+  completionStat: {
+    flex: 1,
+    minHeight: 76,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  completionValue: { color: colors.text, fontSize: 20, fontWeight: '900' },
+  completionLabel: { color: colors.textMuted, fontSize: 8, fontWeight: '700', letterSpacing: 1.2 },
   overviewButton: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -551,7 +610,6 @@ const styles = StyleSheet.create({
   },
   nextText: { color: colors.text, fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
   disabled: { opacity: 0.3 },
-  prototypeNote: { color: colors.textMuted, fontSize: 10, textAlign: 'center' },
   overviewList: { gap: spacing.sm },
   overviewRow: {
     minHeight: 68,
