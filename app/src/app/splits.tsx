@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 
 import { colors, spacing } from '@/constants/theme';
 import { workoutRepository } from '@/repositories';
+import { WEEKDAYS } from '@/types/workout';
 import type { PlannedExercise, SplitDay, WorkoutSplit } from '@/types/workout';
 
 
@@ -25,6 +26,7 @@ export default function SplitsScreen() {
   const [days, setDays] = useState<SplitDay[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [weekdayMenuId, setWeekdayMenuId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -94,7 +96,7 @@ export default function SplitsScreen() {
     const option = palette[days.length % palette.length];
     const id = makeId('day');
     const nextDays = [...days, {
-      id, name: 'NEW DAY', workoutDay: 'THURSDAY', color: option.color, exercises: [],
+      id, name: 'NEW DAY', workoutDay: WEEKDAYS[days.length % WEEKDAYS.length], color: option.color, exercises: [],
     }];
     void saveDays(nextDays);
     setExpandedId(id);
@@ -147,9 +149,16 @@ export default function SplitsScreen() {
                   {editing ? <>
                     <View style={styles.workoutDayRow}>
                       <View style={[styles.colorDot, { backgroundColor: day.color }]} />
-                      <TextInput accessibilityLabel="Workout day" autoCapitalize="characters"
-                        onChangeText={(workoutDay) => updateDay(day.id, { workoutDay })}
-                        style={styles.workoutDayInput} value={day.workoutDay} />
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Choose workout weekday"
+                        accessibilityState={{ expanded: weekdayMenuId === day.id }}
+                        onPress={() => setWeekdayMenuId((current) => current === day.id ? null : day.id)}
+                        style={styles.weekdayButton}
+                      >
+                        <Text style={styles.weekdayButtonText}>{day.workoutDay}</Text>
+                        <Text style={styles.weekdayChevron}>⌄</Text>
+                      </Pressable>
                     </View>
                     <TextInput accessibilityLabel="Split day name" autoCapitalize="characters"
                       onChangeText={(name) => updateDay(day.id, { name })} style={styles.titleInput} value={day.name} />
@@ -165,6 +174,7 @@ export default function SplitsScreen() {
                 <View style={styles.headerActions}>
                   <Pressable onPress={() => {
                       if (editing) void saveDays(days);
+                      setWeekdayMenuId(null);
                       setEditingId(editing ? null : day.id);
                       setExpandedId(day.id);
                     }}
@@ -178,6 +188,24 @@ export default function SplitsScreen() {
               </View>
 
               {editing && <View style={styles.colorEditor}>
+                {weekdayMenuId === day.id && <View style={styles.weekdayMenu}>
+                  {WEEKDAYS.map((weekday) => (
+                    <Pressable
+                      key={weekday}
+                      accessibilityRole="button"
+                      onPress={() => {
+                        updateDay(day.id, { workoutDay: weekday });
+                        setWeekdayMenuId(null);
+                      }}
+                      style={[styles.weekdayOption, weekday === day.workoutDay && styles.weekdayOptionSelected]}
+                    >
+                      <Text style={[styles.weekdayOptionText, weekday === day.workoutDay && styles.weekdayOptionTextSelected]}>
+                        {weekday}
+                      </Text>
+                      {weekday === day.workoutDay && <Text style={styles.weekdayCheck}>✓</Text>}
+                    </Pressable>
+                  ))}
+                </View>}
                 <Text style={styles.label}>DAY COLOR</Text>
                 <View style={styles.palette}>{palette.map((option) =>
                   <Pressable key={option.name} accessibilityLabel={'Use ' + option.name}
@@ -248,7 +276,9 @@ const styles = StyleSheet.create({
   workoutDayRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   colorDot: { width: 8, height: 8, borderRadius: 4 },
   workoutDay: { color: colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.8 },
-  workoutDayInput: { flex: 1, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.textSubtle, fontSize: 10, fontWeight: '800', letterSpacing: 1.8, paddingVertical: 3 },
+  weekdayButton: { minWidth: 132, minHeight: 32, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  weekdayButtonText: { color: colors.text, fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
+  weekdayChevron: { color: colors.textMuted, fontSize: 16 },
   dayTitle: { color: colors.text, fontSize: 25, lineHeight: 29, fontWeight: '900', letterSpacing: -0.5 },
   titleInput: { color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.textSubtle, fontSize: 24, lineHeight: 29, fontWeight: '900', paddingVertical: 2 },
   count: { color: colors.textMuted, fontSize: 9, letterSpacing: 1, marginTop: 2 },
@@ -261,6 +291,12 @@ const styles = StyleSheet.create({
   chevron: { color: colors.textMuted, fontSize: 23, lineHeight: 24 },
   chevronExpanded: { transform: [{ rotate: '180deg' }] },
   colorEditor: { borderTopWidth: 1, borderTopColor: colors.textSubtle, marginTop: spacing.lg, paddingTop: spacing.md, gap: spacing.sm },
+  weekdayMenu: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, marginBottom: spacing.sm },
+  weekdayOption: { minHeight: 40, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.border },
+  weekdayOptionSelected: { backgroundColor: colors.accentDark },
+  weekdayOptionText: { color: colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
+  weekdayOptionTextSelected: { color: colors.text },
+  weekdayCheck: { color: colors.accent, fontSize: 13, fontWeight: '900' },
   label: { color: colors.textMuted, fontSize: 9, fontWeight: '800', letterSpacing: 1.6 },
   palette: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   swatch: { width: 32, height: 32, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },

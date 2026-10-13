@@ -164,6 +164,19 @@ export class MockWorkoutRepository implements WorkoutRepository {
       completedAt: new Date().toISOString(),
     };
     sessions.set(sessionId, completed);
+
+    if (completed.splitId === activeSplit.id && activeSplit.days.length > 0) {
+      const completedDayIndex = activeSplit.days.findIndex(
+        (day) => day.id === completed.splitDayId,
+      );
+      if (completedDayIndex >= 0) {
+        activeSplit = {
+          ...activeSplit,
+          nextDayIndex: (completedDayIndex + 1) % activeSplit.days.length,
+        };
+      }
+    }
+
     return clone(completed);
   }
 

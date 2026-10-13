@@ -2,6 +2,18 @@ export type EntityId = string;
 
 export type TargetUnit = 'REPS' | 'SEC';
 
+export const WEEKDAYS = [
+  'MONDAY',
+  'TUESDAY',
+  'WEDNESDAY',
+  'THURSDAY',
+  'FRIDAY',
+  'SATURDAY',
+  'SUNDAY',
+] as const;
+
+export type Weekday = (typeof WEEKDAYS)[number];
+
 export type WorkoutStatus = 'draft' | 'completed' | 'abandoned';
 
 export type ExerciseStatus = 'NOT STARTED' | 'IN PROGRESS' | 'COMPLETED';
@@ -20,7 +32,7 @@ export type PlannedExercise = {
 export type SplitDay = {
   id: EntityId;
   name: string;
-  workoutDay: string;
+  workoutDay: Weekday;
   color: string;
   exercises: PlannedExercise[];
 };
