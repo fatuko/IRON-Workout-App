@@ -165,6 +165,32 @@ export class MockWorkoutRepository implements WorkoutRepository {
     };
     sessions.set(sessionId, completed);
 
+    activeSplit = {
+      ...activeSplit,
+      days: activeSplit.days.map((day) => day.id !== completed.splitDayId ? day : {
+        ...day,
+        exercises: day.exercises.map((plannedExercise) => {
+          const completedExercise = completed.exercises.find((exercise) => exercise.id === plannedExercise.id);
+          if (!completedExercise || completedExercise.targetUnit !== 'REPS') return plannedExercise;
+
+          const bestSet = completedExercise.sets
+            .filter((set) => set.complete && (Number(set.weight) || 0) > 0)
+            .sort((a, b) => (Number(b.weight) || 0) - (Number(a.weight) || 0))[0];
+          if (!bestSet) return plannedExercise;
+
+          const previousWeightMatch = plannedExercise.pr.match(/([\d.]+)\s*LB/i);
+          const previousWeight = previousWeightMatch ? Number(previousWeightMatch[1]) : 0;
+          const completedWeight = Number(bestSet.weight) || 0;
+          if (completedWeight <= previousWeight) return plannedExercise;
+
+          return {
+            ...plannedExercise,
+            pr: String(completedWeight) + ' LB × ' + String(Number(bestSet.reps) || 0),
+          };
+        }),
+      }),
+    };
+
     if (completed.splitId === activeSplit.id && activeSplit.days.length > 0) {
       const completedDayIndex = activeSplit.days.findIndex(
         (day) => day.id === completed.splitDayId,

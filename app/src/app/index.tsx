@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors, spacing, typography } from '@/constants/theme';
@@ -22,17 +23,45 @@ function getWorkoutStreak(history: WorkoutSession[], now: Date) {
   return streak;
 }
 
-function getWeeklyVolume(history: WorkoutSession[], weekKeys: Set<string>) {
-  return history
-    .filter((session) => session.completedAt && weekKeys.has(getLocalDateKey(session.completedAt)))
-    .flatMap((session) => session.exercises)
+function getCompletedSetCount(session: WorkoutSession) {
+  return session.exercises
     .flatMap((exercise) => exercise.sets)
     .filter((set) => set.complete)
-    .reduce((total, set) => total + (Number(set.weight) || 0) * (Number(set.reps) || 0), 0);
+    .length;
 }
 
-function formatVolume(value: number) {
-  return value >= 1000 ? (value / 1000).toFixed(1).replace('.0', '') + 'K' : String(value);
+type PersonalRecord = {
+  id: string;
+  exerciseName: string;
+  previousWeight: number | null;
+  newWeight: number;
+  reps: number;
+  completedAt: string;
+};
+
+function getPersonalRecords(history: WorkoutSession[]): PersonalRecord[] {
+  return history.flatMap((session) => session.exercises.flatMap((exercise) => {
+    if (!session.completedAt || exercise.targetUnit !== 'REPS') return [];
+
+    const bestSet = exercise.sets
+      .filter((set) => set.complete && (Number(set.weight) || 0) > 0)
+      .sort((a, b) => (Number(b.weight) || 0) - (Number(a.weight) || 0))[0];
+    if (!bestSet) return [];
+
+    const previousMatch = exercise.lastPerformance.match(/([\d.]+)\s*LB/i);
+    const previousWeight = previousMatch ? Number(previousMatch[1]) : null;
+    const newWeight = Number(bestSet.weight) || 0;
+    if (previousWeight !== null && newWeight <= previousWeight) return [];
+
+    return [{
+      id: session.id + '-' + exercise.id,
+      exerciseName: exercise.name,
+      previousWeight,
+      newWeight,
+      reps: Number(bestSet.reps) || 0,
+      completedAt: session.completedAt,
+    }];
+  }));
 }
 
 export default function HomeScreen() {
@@ -65,7 +94,6 @@ export default function HomeScreen() {
   useFocusEffect(useCallback(() => { void loadHome(); }, [loadHome]));
 
   const week = useMemo(() => getLocalWeek(now), [now]);
-  const weekKeys = useMemo(() => new Set(week.map((day) => day.key)), [week]);
   const completedDays = useMemo(() => new Set(history.flatMap((session) =>
     session.completedAt ? [getLocalDateKey(session.completedAt)] : [],
   )), [history]);
@@ -78,10 +106,15 @@ export default function HomeScreen() {
   const lastMatchingWorkout = nextDay
     ? history.find((session) => session.splitDayId === nextDay.id)
     : null;
-  const stats = [
-    { label: 'STREAK', value: String(getWorkoutStreak(history, now)), unit: 'days' },
-    { label: 'VOLUME', value: formatVolume(getWeeklyVolume(history, weekKeys)), unit: 'lbs this week' },
-  ];
+  const dailySetCounts = week.map((day) => history
+    .filter((session) => session.completedAt && getLocalDateKey(session.completedAt) === day.key)
+    .reduce((total, session) => total + getCompletedSetCount(session), 0));
+  const maxDailySets = Math.max(...dailySetCounts, 1);
+  const streak = getWorkoutStreak(history, now);
+  const personalRecords = getPersonalRecords(history);
+  const weeklyPersonalRecords = personalRecords.filter((record) =>
+    week.some((day) => day.key === getLocalDateKey(record.completedAt)),
+  );
 
   const startWorkout = async () => {
     if (!nextDay || starting) return;
@@ -113,27 +146,31 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.panel}>
-        <Text style={styles.sectionTitle}>THIS WEEK</Text>
-        <View style={styles.weekRow}>
-          {week.map((item) => {
-            const complete = completedDays.has(item.key);
-            return (
-              <View key={item.key} style={styles.dayColumn}>
-                <View style={[styles.dayBox, complete && styles.dayBoxComplete, item.isToday && styles.dayBoxToday]}>
-                  {complete && <Text style={styles.checkmark}>✓</Text>}
-                </View>
-                <Text style={[styles.dayLabel, item.isToday && styles.dayLabelToday]}>{item.label}</Text>
+      <View style={styles.weekTracker}>
+        {week.map((item) => {
+          const complete = completedDays.has(item.key);
+          const weekday = item.date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+          return (
+            <View key={item.key} style={styles.dayColumn}>
+              <Text style={[styles.dayLabel, item.isToday && styles.dayLabelToday]}>{weekday}</Text>
+              <View style={[styles.dayBox, complete && styles.dayBoxComplete, item.isToday && !complete && styles.dayBoxToday]}>
+                <Text style={[styles.dayNumber, complete && styles.dayNumberComplete]}>{item.date.getDate()}</Text>
               </View>
-            );
-          })}
-        </View>
+            </View>
+          );
+        })}
       </View>
 
       {loading ? (
         <View style={styles.loadingCard}><ActivityIndicator color={colors.accent} /></View>
       ) : nextDay ? (
         <View style={styles.workoutCard}>
+          <SymbolView
+            name={{ ios: 'dumbbell.fill', android: 'fitness_center', web: 'fitness_center' }}
+            size={132}
+            tintColor={colors.accent}
+            style={styles.workoutWatermark}
+          />
           <View style={styles.workoutTopRow}>
             <Text style={styles.nextLabel}>NEXT WORKOUT</Text>
             <Text style={styles.daysAgo}>{formatDaysAgo(lastMatchingWorkout?.completedAt ?? null, now)}</Text>
@@ -171,33 +208,68 @@ export default function HomeScreen() {
 
       {error && <Text style={styles.errorText}>{error}</Text>}
 
-      <View style={styles.statsRow}>
-        {stats.map((stat) => (
-          <View key={stat.label} style={styles.statCard}>
-            <Text numberOfLines={1} style={styles.statLabel}>{stat.label}</Text>
-            <Text style={styles.statValue}>{stat.value}</Text>
-            <Text numberOfLines={1} style={styles.statUnit}>{stat.unit}</Text>
+      <View style={styles.activityCard}>
+        <View style={styles.activityHeader}>
+          <Text style={styles.sectionTitle}>ACTIVITY</Text>
+          <View style={styles.activityMetrics}>
+            <View>
+              <Text style={styles.metricValue}>{streak}</Text>
+              <Text style={styles.metricLabel}>DAY STREAK</Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View>
+              <Text style={styles.metricValue}>{weeklyPersonalRecords.length}</Text>
+              <Text style={styles.metricLabel}>PRS THIS WEEK</Text>
+            </View>
           </View>
-        ))}
+        </View>
+
+        <View style={styles.chart}>
+          {week.map((day, index) => {
+            const barHeight = dailySetCounts[index] === 0
+              ? 5
+              : Math.max(10, Math.round((dailySetCounts[index] / maxDailySets) * 58));
+            return (
+              <View key={day.key} style={styles.chartColumn}>
+                <View style={styles.barTrack}>
+                  <View style={[
+                    styles.volumeBar,
+                    { height: barHeight },
+                    dailySetCounts[index] === 0 && styles.volumeBarEmpty,
+                    day.isToday && styles.volumeBarToday,
+                  ]} />
+                </View>
+                <Text style={[styles.chartLabel, day.isToday && styles.chartLabelToday]}>{day.label}</Text>
+              </View>
+            );
+          })}
+        </View>
       </View>
 
       <View style={styles.recentSection}>
         <View style={styles.recentHeader}>
-          <Text style={styles.sectionTitle}>RECENT WORKOUTS</Text>
+          <Text style={styles.sectionTitle}>RECENT PRS</Text>
           <Pressable accessibilityRole="button" onPress={() => router.push('/history')}>
             <Text style={styles.viewAll}>VIEW ALL →</Text>
           </Pressable>
         </View>
-        {history.length === 0 ? (
+        {personalRecords.length === 0 ? (
           <View style={styles.emptyHistoryCard}>
-            <Text style={styles.emptyHistoryText}>COMPLETED WORKOUTS WILL SHOW HERE</Text>
+            <Text style={styles.emptyHistoryText}>YOUR PRS WILL SHOW HERE</Text>
           </View>
         ) : (
           <View style={styles.historyList}>
-            {history.slice(0, 3).map((session) => (
-              <View key={session.id} style={styles.historyRow}>
-                <Text numberOfLines={1} style={styles.historyName}>{session.workoutName}</Text>
-                <Text style={styles.historyDate}>{formatDaysAgo(session.completedAt, now)}</Text>
+            {personalRecords.slice(0, 3).map((record) => (
+              <View key={record.id} style={styles.historyRow}>
+                <View style={styles.prNameGroup}>
+                  <Text numberOfLines={1} style={styles.historyName}>{record.exerciseName}</Text>
+                  <Text style={styles.historyDate}>{formatDaysAgo(record.completedAt, now)}</Text>
+                </View>
+                <View style={styles.prResult}>
+                  <Text style={styles.previousPr}>{record.previousWeight ?? 'NEW'}</Text>
+                  <Text style={styles.currentPr}>{record.newWeight}</Text>
+                  <Text style={styles.prUnit}>LB × {record.reps}</Text>
+                </View>
               </View>
             ))}
           </View>
@@ -209,24 +281,25 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  page: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: 48, gap: spacing.xl, backgroundColor: colors.background },
+  page: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: 112, gap: spacing.xl, backgroundColor: colors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   eyebrow: typography.eyebrow,
   greeting: { ...typography.heading, marginTop: 2 },
   profile: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: colors.accent, backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
   profileText: { color: colors.text, fontSize: 19, fontWeight: '800' },
-  panel: { padding: spacing.lg, gap: spacing.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   sectionTitle: typography.sectionTitle,
-  weekRow: { flexDirection: 'row', gap: spacing.sm },
-  dayColumn: { flex: 1, alignItems: 'center', gap: spacing.sm },
-  dayBox: { width: '100%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised },
+  weekTracker: { flexDirection: 'row', gap: spacing.sm },
+  dayColumn: { flex: 1, alignItems: 'center', gap: 7 },
+  dayBox: { width: '100%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised, borderRadius: 10 },
   dayBoxComplete: { backgroundColor: colors.accent },
   dayBoxToday: { borderWidth: 1, borderColor: colors.accent },
-  checkmark: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  dayLabel: { color: colors.textMuted, fontSize: 10, fontWeight: '600' },
+  dayNumber: { color: colors.textMuted, fontSize: 14, fontWeight: '800' },
+  dayNumberComplete: { color: colors.text },
+  dayLabel: { color: colors.textMuted, fontSize: 9, fontWeight: '700', letterSpacing: 0.7 },
   dayLabelToday: { color: colors.accent },
-  loadingCard: { minHeight: 240, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.accent, backgroundColor: '#100B0A' },
-  workoutCard: { padding: spacing.lg, gap: spacing.sm, borderWidth: 1, borderColor: colors.accent, backgroundColor: '#100B0A', overflow: 'hidden' },
+  loadingCard: { minHeight: 240, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.accent, borderRadius: 20, backgroundColor: '#100B0A' },
+  workoutCard: { position: 'relative', padding: spacing.xl, gap: spacing.sm, borderWidth: 1, borderColor: colors.accent, borderRadius: 20, backgroundColor: '#100B0A', overflow: 'hidden' },
+  workoutWatermark: { position: 'absolute', right: -24, top: 38, opacity: 0.08, transform: [{ rotate: '-14deg' }] },
   workoutTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
   nextLabel: { color: colors.accent, backgroundColor: colors.accentDark, paddingHorizontal: spacing.md, paddingVertical: 6, fontSize: 10, fontWeight: '800', letterSpacing: 2 },
   daysAgo: { flex: 1, color: colors.textMuted, fontSize: 10, textAlign: 'right' },
@@ -237,24 +310,38 @@ const styles = StyleSheet.create({
   number: { color: colors.text, fontSize: 29, fontWeight: '900' },
   numberLabel: { color: colors.textMuted, fontSize: 12 },
   divider: { width: 1, height: 28, backgroundColor: colors.border },
-  startButton: { backgroundColor: colors.accent, paddingVertical: 17, alignItems: 'center', justifyContent: 'center', marginTop: spacing.xs },
+  startButton: { backgroundColor: colors.accent, paddingVertical: 17, alignItems: 'center', justifyContent: 'center', marginTop: spacing.xs, borderRadius: 12 },
   pressed: { opacity: 0.78 },
   startButtonText: { color: colors.text, fontSize: 16, fontWeight: '900' },
-  emptyCard: { minHeight: 180, padding: spacing.xl, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
+  emptyCard: { minHeight: 180, padding: spacing.xl, borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
   emptyTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
   errorText: { color: colors.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  statsRow: { flexDirection: 'row', gap: spacing.sm },
-  statCard: { flex: 1, minWidth: 0, padding: spacing.md, minHeight: 92, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
-  statLabel: { ...typography.sectionTitle, fontSize: 8, letterSpacing: 1.5 },
-  statValue: { color: colors.text, fontSize: 27, fontWeight: '900', marginTop: 5 },
-  statUnit: { color: colors.textMuted, fontSize: 9, marginTop: 2 },
+  activityCard: { padding: spacing.lg, gap: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface },
+  activityHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md },
+  activityMetrics: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  metricValue: { color: colors.text, fontSize: 22, fontWeight: '900', textAlign: 'right' },
+  metricLabel: { color: colors.textMuted, fontSize: 7, fontWeight: '800', letterSpacing: 0.8, marginTop: 2, textAlign: 'right' },
+  metricDivider: { width: 1, height: 34, backgroundColor: colors.border },
+  chart: { height: 88, flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+  chartColumn: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'flex-end', gap: 7 },
+  barTrack: { flex: 1, width: '100%', justifyContent: 'flex-end', alignItems: 'center' },
+  volumeBar: { width: '58%', minHeight: 5, borderRadius: 6, backgroundColor: colors.accent },
+  volumeBarEmpty: { backgroundColor: colors.checked },
+  volumeBarToday: { borderWidth: 1, borderColor: colors.orange },
+  chartLabel: { color: colors.textMuted, fontSize: 8, fontWeight: '800' },
+  chartLabelToday: { color: colors.accent },
   recentSection: { gap: spacing.lg },
   recentHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   viewAll: { color: colors.accent, fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
-  emptyHistoryCard: { minHeight: 72, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  emptyHistoryCard: { minHeight: 72, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.surface },
   emptyHistoryText: { color: colors.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
   historyList: { gap: spacing.sm },
-  historyRow: { minHeight: 66, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  historyName: { flex: 1, color: colors.text, fontSize: 14, fontWeight: '700' },
-  historyDate: { color: colors.textMuted, fontSize: 10 },
+  historyRow: { minHeight: 66, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  prNameGroup: { flex: 1, minWidth: 0, gap: 4 },
+  historyName: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  historyDate: { color: colors.textMuted, fontSize: 9 },
+  prResult: { flexDirection: 'row', alignItems: 'baseline', gap: 7 },
+  previousPr: { color: colors.textSubtle, fontSize: 10, textDecorationLine: 'line-through' },
+  currentPr: { color: colors.accent, fontSize: 18, fontWeight: '900' },
+  prUnit: { color: colors.textMuted, fontSize: 9 },
 });
