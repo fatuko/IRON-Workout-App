@@ -88,7 +88,7 @@ function createSets(count: number): WorkoutSet[] {
   }));
 }
 
-function createWorkoutExercise(exercise: PlannedExercise): WorkoutExercise {
+function createWorkoutExercise(exercise: PlannedExercise, previousExercise?: WorkoutExercise): WorkoutExercise {
   const unitLabel = exercise.unit === 'REPS' ? 'reps' : 'seconds';
   return {
     id: exercise.id,
@@ -97,6 +97,7 @@ function createWorkoutExercise(exercise: PlannedExercise): WorkoutExercise {
     targetUnit: exercise.unit,
     lastPerformance: parsePreviousPerformance(exercise.pr),
     restSeconds: exercise.unit === 'REPS' ? 120 : 60,
+    previousSets: clone(previousExercise?.sets.filter((set) => set.complete) ?? []),
     sets: createSets(Math.max(1, Number(exercise.sets) || 1)),
   };
 }
@@ -175,7 +176,14 @@ export class MockWorkoutRepository implements WorkoutRepository {
       status: 'draft',
       startedAt: new Date().toISOString(),
       completedAt: null,
-      exercises: day.exercises.map(createWorkoutExercise),
+      exercises: day.exercises.map((plannedExercise) => {
+        const previousExercise = [...sessions.values()]
+          .filter((previousSession) => previousSession.status === 'completed')
+          .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))
+          .map((previousSession) => previousSession.exercises.find((item) => item.id === plannedExercise.id))
+          .find((item): item is WorkoutExercise => Boolean(item));
+        return createWorkoutExercise(plannedExercise, previousExercise);
+      }),
     };
     sessions.set(session.id, clone(session));
     return clone(session);
@@ -204,6 +212,15 @@ export class MockWorkoutRepository implements WorkoutRepository {
           }
         : exercise,
     );
+    sessions.set(sessionId, session);
+  }
+
+  async deleteWorkoutSet(sessionId: string, exerciseId: string, setId: number) {
+    const session = sessions.get(sessionId);
+    if (!session) throw new Error('Workout not found');
+    session.exercises = session.exercises.map((exercise) => exercise.id === exerciseId
+      ? { ...exercise, sets: exercise.sets.filter((set) => set.id !== setId) }
+      : exercise);
     sessions.set(sessionId, session);
   }
 

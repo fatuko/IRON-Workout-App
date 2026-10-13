@@ -69,6 +69,7 @@ export type WorkoutExercise = {
   targetUnit: TargetUnit;
   lastPerformance: string;
   restSeconds: number;
+  previousSets: WorkoutSet[];
   sets: WorkoutSet[];
 };
 

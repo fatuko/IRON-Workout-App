@@ -4,11 +4,14 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  LayoutAnimation,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
 } from 'react-native';
 
@@ -20,10 +23,23 @@ import type { WorkoutExercise, WorkoutSession, WorkoutSet, WorkoutSetField } fro
 
 
 
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const animateLayout = () => LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+
 function formatTimer(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function formatPreviousSet(exercise: WorkoutExercise, set: WorkoutSet) {
+  if (exercise.targetUnit === 'SEC') return set.seconds ? set.seconds + ' SEC' : '—';
+  if (!set.weight || !set.reps) return '—';
+  return set.weight + ' LB × ' + set.reps + (set.rir ? ' · RIR ' + set.rir : '');
 }
 
 function getExerciseStatus(exercise: WorkoutExercise) {
@@ -181,12 +197,15 @@ export default function WorkoutScreen() {
         useNativeDriver: true,
       }).start(() => setAnimatedSetKey(null));
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      animateLayout();
       setRestRemaining(exercise.restSeconds);
     }
   }
 
   function addSet() {
     if (!exercise) return;
+    animateLayout();
+    void Haptics.selectionAsync();
     const nextSet: WorkoutSet = {
       id: Math.max(0, ...exercise.sets.map((set) => set.id)) + 1,
       weight: '',
@@ -207,7 +226,37 @@ export default function WorkoutScreen() {
     }
   }
 
+  function removeSet(setId: number) {
+    if (!exercise || !session) return;
+    if (exercise.sets.length === 1) {
+      Alert.alert('Keep one set', 'An exercise needs at least one set.');
+      return;
+    }
+
+    const target = exercise.sets.find((set) => set.id === setId);
+    if (!target) return;
+
+    const remove = () => {
+      animateLayout();
+      setExercises((current) => current.map((item, index) => index !== activeIndex
+        ? item
+        : { ...item, sets: item.sets.filter((set) => set.id !== setId) }));
+      void workoutRepository.deleteWorkoutSet(session.id, exercise.id, setId);
+      void Haptics.selectionAsync();
+    };
+
+    if (target.complete || target.weight || target.reps || target.seconds || target.rir) {
+      Alert.alert('Remove set?', 'The values entered for this set will be deleted.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: remove },
+      ]);
+      return;
+    }
+    remove();
+  }
+
   function openCompletion() {
+    animateLayout();
     setReviewDuration((current) => (
       current ?? Math.max(1, Math.floor((Date.now() - workoutStartedAt.current) / 1000))
     ));
@@ -220,6 +269,7 @@ export default function WorkoutScreen() {
   function advanceExercise() {
     const hasIncompleteSets = exercise.sets.some((set) => !set.complete);
     const advance = () => {
+      animateLayout();
       setRestRemaining(null);
       if (activeIndex === exercises.length - 1) openCompletion();
       else setActiveIndex((index) => index + 1);
@@ -241,6 +291,7 @@ export default function WorkoutScreen() {
   }
 
   function selectExercise(index: number) {
+    animateLayout();
     setActiveIndex(index);
     setShowOverview(false);
     setShowReview(false);
@@ -335,7 +386,6 @@ export default function WorkoutScreen() {
       <ScrollView style={styles.screen} contentContainerStyle={styles.page}>
         <View style={styles.topBar}>
           <View>
-            <Text style={styles.eyebrow}>WORKOUT</Text>
             <Text style={styles.screenTitle}>{session.workoutName}</Text>
           </View>
           <Pressable onPress={() => setShowOverview(false)} style={styles.closeButton}>
@@ -373,17 +423,17 @@ export default function WorkoutScreen() {
 
   return (
     <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
       style={styles.screen}
       contentContainerStyle={styles.page}>
       <View style={styles.topBar}>
         <View>
-          <Text style={styles.eyebrow}>WORKOUT</Text>
           <Text style={styles.screenTitle}>{session.workoutName}</Text>
           <Text style={styles.progressText}>EXERCISE {activeIndex + 1} OF {exercises.length}</Text>
         </View>
-        <Pressable onPress={() => setShowOverview(true)} style={styles.overviewButton}>
+        <Pressable onPress={() => { animateLayout(); setShowOverview(true); }} style={styles.overviewButton}>
           <Text style={styles.overviewButtonText}>OVERVIEW</Text>
         </Pressable>
       </View>
@@ -431,10 +481,14 @@ export default function WorkoutScreen() {
             </>
           )}
           <View style={styles.doneColumn} />
+          <View style={styles.removeColumn} />
         </View>
 
-        {exercise.sets.map((set, index) => (
-          <View key={set.id} style={[styles.setRow, set.complete && styles.setRowComplete]}>
+        {exercise.sets.map((set, index) => {
+          const previousSet = exercise.previousSets?.[index];
+          return (
+          <View key={set.id} style={styles.setGroup}>
+            <View style={[styles.setRow, set.complete && styles.setRowComplete]}>
             <Text style={[styles.setNumber, styles.setColumn]}>{String(index + 1).padStart(2, '0')}</Text>
             {isTimedExercise ? (
               <TextInput
@@ -490,8 +544,20 @@ export default function WorkoutScreen() {
                 <Text style={styles.checkButtonText}>{set.complete ? '✓' : ''}</Text>
               </Pressable>
             </Animated.View>
+            <Pressable
+              accessibilityLabel={'Remove set ' + (index + 1)}
+              onPress={() => removeSet(set.id)}
+              style={styles.removeSetButton}
+            >
+              <Text style={styles.removeSetText}>−</Text>
+            </Pressable>
+            </View>
+            {previousSet && (
+              <Text style={styles.previousSetText}>LAST: {formatPreviousSet(exercise, previousSet)}</Text>
+            )}
           </View>
-        ))}
+          );
+        })}
       </View>
 
       <Pressable onPress={addSet} style={styles.addSetButton}>
@@ -502,6 +568,7 @@ export default function WorkoutScreen() {
         <Pressable
           disabled={activeIndex === 0}
           onPress={() => {
+            animateLayout();
             setRestRemaining(null);
             setActiveIndex((index) => Math.max(0, index - 1));
           }}
@@ -524,16 +591,16 @@ const styles = StyleSheet.create({
   centerState: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   errorText: { color: colors.textMuted, fontSize: 13, textAlign: 'center' },
   page: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxl,
     paddingBottom: 112,
-    gap: spacing.lg,
+    gap: spacing.xl,
     backgroundColor: colors.background,
   },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   eyebrow: typography.eyebrow,
-  screenTitle: { color: colors.text, fontSize: 35, fontWeight: '900', marginTop: 4 },
-  progressText: { color: colors.text, fontSize: 19, fontWeight: '900', marginTop: 5 },
+  screenTitle: { color: colors.text, fontSize: 34, lineHeight: 39, fontWeight: '900', letterSpacing: -0.8 },
+  progressText: { color: colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.4, marginTop: 8 },
   completionMessage: { color: colors.textMuted, fontSize: 13, marginTop: -spacing.md },
   completionStats: { flexDirection: 'row', gap: spacing.sm },
   completionStat: {
@@ -559,8 +626,8 @@ const styles = StyleSheet.create({
   overviewButtonText: { color: colors.textMuted, fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
   closeButton: { paddingHorizontal: spacing.md, paddingVertical: 10 },
   closeButtonText: { color: colors.accent, fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
-  progressTrack: { height: 3, backgroundColor: colors.checked },
-  progressFill: { height: '100%', backgroundColor: colors.accent },
+  progressTrack: { height: 5, borderRadius: 3, backgroundColor: colors.checked, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: colors.accent },
   timerCard: {
     backgroundColor: colors.accentDark,
     borderWidth: 1,
@@ -581,11 +648,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.lg,
-    gap: spacing.sm,
-    borderRadius: 16,
+    padding: spacing.xl,
+    gap: spacing.md,
+    borderRadius: 18,
   },
-  exerciseName: { color: colors.text, fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  exerciseName: { color: colors.text, fontSize: 30, fontWeight: '900', letterSpacing: -0.5 },
   exerciseMetaRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   repRange: { color: colors.accent, fontSize: 9, fontWeight: '700', letterSpacing: 1.2 },
   restDefault: { color: colors.textMuted, fontSize: 9, letterSpacing: 1 },
@@ -613,8 +680,10 @@ const styles = StyleSheet.create({
   },
   setColumn: { flex: 0, width: 28 },
   doneColumn: { width: 42 },
+  removeColumn: { width: 28 },
+  setGroup: { gap: 6 },
   setRow: {
-    minHeight: 58,
+    minHeight: 66,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -625,6 +694,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   setRowComplete: { borderColor: colors.accent, backgroundColor: colors.accentDark },
+  previousSetText: { color: colors.textMuted, fontSize: 9, fontWeight: '700', letterSpacing: 0.7, paddingLeft: 40 },
   setNumber: { color: colors.textMuted, fontSize: 11, fontWeight: '700' },
   input: {
     flex: 1,
@@ -648,6 +718,8 @@ const styles = StyleSheet.create({
   },
   checkButtonComplete: { backgroundColor: colors.accent, borderColor: colors.accent },
   checkButtonText: { color: colors.text, fontSize: 17, fontWeight: '900' },
+  removeSetButton: { width: 28, height: 42, alignItems: 'center', justifyContent: 'center' },
+  removeSetText: { color: colors.textMuted, fontSize: 20, fontWeight: '500' },
   addSetButton: {
     minHeight: 48,
     borderWidth: 1,

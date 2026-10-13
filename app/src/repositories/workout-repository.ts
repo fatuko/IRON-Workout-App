@@ -24,6 +24,7 @@ export interface WorkoutRepository {
     exerciseId: string,
     set: WorkoutSet,
   ): Promise<void>;
+  deleteWorkoutSet(sessionId: string, exerciseId: string, setId: number): Promise<void>;
   finishWorkout(sessionId: string): Promise<WorkoutSession>;
   getWorkoutHistory(): Promise<WorkoutSession[]>;
 
