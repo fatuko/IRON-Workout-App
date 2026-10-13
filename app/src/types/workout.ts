@@ -29,8 +29,16 @@ export type PlannedExercise = {
   pr: string;
 };
 
+export type WorkoutTemplate = {
+  id: EntityId;
+  name: string;
+  color: string;
+  exercises: PlannedExercise[];
+};
+
 export type SplitDay = {
   id: EntityId;
+  workoutId: EntityId;
   name: string;
   workoutDay: Weekday;
   color: string;

@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   page: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.xl,
-    paddingBottom: 64,
+    paddingBottom: 112,
     gap: spacing.xl,
     backgroundColor: colors.background,
   },
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     minHeight: 180,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 16,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   sessionCard: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 16,
     backgroundColor: colors.surface,
     overflow: 'hidden',
   },

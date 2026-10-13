@@ -5,6 +5,8 @@ import type {
   WorkoutSession,
   WorkoutSet,
   WorkoutSplit,
+  WorkoutTemplate,
+  Weekday,
 } from '@/types/workout';
 
 import type { WorkoutRepository } from './workout-repository';
@@ -35,15 +37,37 @@ const starterExercises = {
   ],
 } satisfies Record<string, PlannedExercise[]>;
 
+let workoutTemplates: WorkoutTemplate[] = [
+  { id: 'push', name: 'PUSH A', color: '#FF3D00', exercises: starterExercises.push },
+  { id: 'push-b', name: 'PUSH B', color: '#FF8A00', exercises: [
+    { id: 'flat-press', name: 'Flat Chest Press', sets: '3', target: '6–10', unit: 'REPS', pr: 'NO PR YET' },
+    { id: 'arnold-press', name: 'Arnold Press', sets: '3', target: '8–12', unit: 'REPS', pr: 'NO PR YET' },
+    { id: 'skull-crusher', name: 'Skull Crusher', sets: '3', target: '10–12', unit: 'REPS', pr: 'NO PR YET' },
+  ] },
+  { id: 'pull', name: 'PULL DAY', color: '#9B6DFF', exercises: starterExercises.pull },
+  { id: 'legs', name: 'LEGS A', color: '#368DFF', exercises: starterExercises.legs },
+  { id: 'legs-b', name: 'LEGS B', color: '#4ECB71', exercises: [
+    { id: 'rdl', name: 'Romanian Deadlift', sets: '4', target: '6–10', unit: 'REPS', pr: 'NO PR YET' },
+    { id: 'hip-thrust', name: 'Hip Thrust', sets: '4', target: '8–12', unit: 'REPS', pr: 'NO PR YET' },
+    { id: 'walking-lunge', name: 'Walking Lunge', sets: '3', target: '10–12', unit: 'REPS', pr: 'NO PR YET' },
+  ] },
+];
+
+function scheduleWorkout(workoutId: string, workoutDay: Weekday, id = createId('scheduled')): SplitDay {
+  const workout = workoutTemplates.find((item) => item.id === workoutId);
+  if (!workout) throw new Error('Workout template not found');
+  return { id, workoutId, workoutDay, name: workout.name, color: workout.color, exercises: clone(workout.exercises) };
+}
+
 let activeSplit: WorkoutSplit = {
   id: 'starter-split',
   name: 'Push Pull Legs',
   isActive: true,
   nextDayIndex: 0,
   days: [
-    { id: 'push', name: 'PUSH DAY', workoutDay: 'MONDAY', color: '#FF3D00', exercises: starterExercises.push },
-    { id: 'pull', name: 'PULL DAY', workoutDay: 'TUESDAY', color: '#9B6DFF', exercises: starterExercises.pull },
-    { id: 'legs', name: 'LEGS DAY', workoutDay: 'WEDNESDAY', color: '#368DFF', exercises: starterExercises.legs },
+    scheduleWorkout('push', 'MONDAY', 'scheduled-push'),
+    scheduleWorkout('pull', 'TUESDAY', 'scheduled-pull'),
+    scheduleWorkout('legs', 'WEDNESDAY', 'scheduled-legs'),
   ],
 };
 
@@ -93,6 +117,35 @@ export class MockWorkoutRepository implements WorkoutRepository {
       ...activeSplit,
       days: activeSplit.days.filter((day) => day.id !== splitDayId),
     };
+  }
+
+  async addWorkoutToSplit(splitId: string, workoutId: string, workoutDay: Weekday) {
+    if (activeSplit.id !== splitId) throw new Error('Split not found');
+    activeSplit = { ...activeSplit, days: [...activeSplit.days, scheduleWorkout(workoutId, workoutDay)] };
+    return clone(activeSplit);
+  }
+
+  async getWorkoutTemplates() {
+    return clone(workoutTemplates);
+  }
+
+  async saveWorkoutTemplate(workout: WorkoutTemplate) {
+    const exists = workoutTemplates.some((item) => item.id === workout.id);
+    workoutTemplates = exists
+      ? workoutTemplates.map((item) => item.id === workout.id ? clone(workout) : item)
+      : [...workoutTemplates, clone(workout)];
+    activeSplit = {
+      ...activeSplit,
+      days: activeSplit.days.map((day) => day.workoutId === workout.id
+        ? { ...day, name: workout.name, color: workout.color, exercises: clone(workout.exercises) }
+        : day),
+    };
+    return clone(workout);
+  }
+
+  async deleteWorkoutTemplate(workoutId: string) {
+    workoutTemplates = workoutTemplates.filter((item) => item.id !== workoutId);
+    activeSplit = { ...activeSplit, days: activeSplit.days.filter((day) => day.workoutId !== workoutId) };
   }
 
   async getSplitDay(splitDayId: string): Promise<SplitDay | null> {
@@ -190,6 +243,19 @@ export class MockWorkoutRepository implements WorkoutRepository {
         }),
       }),
     };
+
+    const updatedDay = activeSplit.days.find((day) => day.id === completed.splitDayId);
+    if (updatedDay) {
+      workoutTemplates = workoutTemplates.map((workout) => workout.id === updatedDay.workoutId
+        ? { ...workout, exercises: clone(updatedDay.exercises) }
+        : workout);
+      activeSplit = {
+        ...activeSplit,
+        days: activeSplit.days.map((day) => day.workoutId === updatedDay.workoutId
+          ? { ...day, exercises: clone(updatedDay.exercises) }
+          : day),
+      };
+    }
 
     if (completed.splitId === activeSplit.id && activeSplit.days.length > 0) {
       const completedDayIndex = activeSplit.days.findIndex(
