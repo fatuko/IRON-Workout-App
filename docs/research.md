@@ -352,14 +352,13 @@ Quick reference for what the engine does and why. Constants live in `api/app/ser
 | 1RM formula | weight-dependent, kg | marzagao2026 |
 | 1RM reliable rep ceiling | 12 | reynolds2006 (citation incomplete) |
 | Hypertrophy volume cap | none | pelland2026 |
-| Strength volume behavior | plateau | pelland2026 |
+| Strength volume plateau | 4 fractional sets/week | pelland2026 Table 4 |
 | Per-session set cap | TBD | remmert2025 (unread) |
 
 **Note on judgment calls:** the novice RIR target and the "general" goal target are not findings. They are our decisions, informed by the evidence that RIR estimation is least reliable in untrained lifters and that failure training carries the highest injury and recovery cost. They should be labeled as project decisions in any write-up, not presented as research conclusions.
 
 ## Open items
 
-- Read pelland2026 Table 4 for the numeric strength volume plateau
 - Read remmert2025 full text for the per-session set cap
 - obtain full text for exact R² by rep range if finer-grained thresholds are wanted
 - Complete the citation for one_rm_exercise_dependent and verify its finding is its own
