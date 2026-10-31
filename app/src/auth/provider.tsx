@@ -1,24 +1,27 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { setWorkoutUser, clearPreviewWorkouts } from '@/repositories';
-import { getPreview, subscribePreview } from './preview';
+import { setWorkoutUser } from '@/repositories';
 
-const Context = createContext<{ session: Session | null; loading: boolean; error: string | null; preview: boolean }>({ session: null, loading: true, error: null, preview: false });
+const Context = createContext<{ session: Session | null; loading: boolean; error: string | null; guest: boolean; enterGuest(): void; leaveGuest(): void }>({ session: null, loading: true, error: null, guest: false, enterGuest: () => {}, leaveGuest: () => {} });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState(getPreview());
-  useEffect(() => subscribePreview(() => {
-    const next = getPreview();
-    setWorkoutUser(null);
-    if (!next.enabled) clearPreviewWorkouts();
-    setWorkoutUser(next.enabled ? next.session?.user.id ?? null : session?.user.id ?? null, next.enabled);
-    setPreview(next);
-  }), [session]);
+  const [guest, setGuest] = useState(false);
+  const guestRef = useRef(false);
+  function enterGuest() {
+    try {
+      setWorkoutUser('device-guest');
+      guestRef.current = true; setGuest(true); setError(null);
+    } catch { setError('Could not open local workouts. Please try again.'); }
+  }
+  function leaveGuest() {
+    setWorkoutUser(session?.user.id ?? null);
+    guestRef.current = false; setGuest(false);
+  }
   useEffect(() => {
     if (!supabase) { setLoading(false); return; }
     let active = true;
@@ -26,7 +29,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     function apply(next: Session | null) {
       if (!active) return;
       try {
-        if (!getPreview().enabled) setWorkoutUser(next?.user.id ?? null);
+        setWorkoutUser(next?.user.id ?? (guestRef.current ? 'device-guest' : null));
+        if (next) { guestRef.current = false; setGuest(false); }
         setSession(next);
         setError(null);
       } catch {
@@ -51,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const listener = AppState.addEventListener('change', refresh);
     return () => { active = false; subscription.unsubscribe(); listener.remove(); if (Platform.OS !== 'web') supabase!.auth.stopAutoRefresh(); };
   }, []);
-  return <Context.Provider value={{ session: preview.enabled ? preview.session : session, loading: preview.enabled ? false : loading, error: preview.enabled ? null : error, preview: preview.enabled }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ session, loading, error, guest, enterGuest, leaveGuest }}>{children}</Context.Provider>;
 }
 
 export const useAuth = () => useContext(Context);

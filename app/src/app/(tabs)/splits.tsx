@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { ActivityIndicator, Alert, LayoutAnimation, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, UIManager, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, LayoutAnimation, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, UIManager, View } from 'react-native';
 
 import { colors, spacing } from '@/constants/theme';
 import { workoutRepository } from '@/repositories';
@@ -18,6 +18,9 @@ const makeId = (prefix: string) => prefix + '-' + Date.now() + '-' + Math.random
 
 export default function SplitsScreen() {
   const router = useRouter();
+  const startingRef = useRef(false);
+  const [startingId, setStartingId] = useState<string | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
   const [split, setSplit] = useState<WorkoutSplit | null>(null);
   const [workouts, setWorkouts] = useState<WorkoutTemplate[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -90,11 +93,20 @@ export default function SplitsScreen() {
   }
 
   async function startWorkout(splitDayId: string) {
+    if (startingRef.current) return;
+    startingRef.current = true;
+    setStartingId(splitDayId); setStartError(null);
     try {
+      const day = split?.days.find(item => item.id === splitDayId);
+      const edited = workouts.find(item => item.id === day?.workoutId && item.id === editingId);
+      // Play must use the exercises visible in the editor, not its older saved copy.
+      if (edited) { await saveWorkout(edited); setEditingId(null); }
       const session = await workoutRepository.startWorkout(splitDayId);
-      router.push({ pathname: '/workout', params: { sessionId: session.id } });
-    } catch {
-      Alert.alert('Could not start workout', 'Add at least one exercise and try again.');
+      router.navigate({ pathname: '/workout', params: { sessionId: session.id } });
+    } catch (error) {
+      setStartError(error instanceof Error ? error.message : 'Could not start workout. Please try again.');
+    } finally {
+      startingRef.current = false; setStartingId(null);
     }
   }
 
@@ -139,12 +151,13 @@ export default function SplitsScreen() {
   if (loadError) return <View style={styles.centerState}><Text style={styles.muted}>{loadError}</Text></View>;
 
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
+    <ScrollView contentInsetAdjustmentBehavior="automatic" automaticallyAdjustKeyboardInsets
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+      keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
       style={styles.screen} contentContainerStyle={styles.page}>
       <View style={styles.sectionPanel}>
         <View style={styles.sectionHeader}>
           <Text style={styles.currentTitle}>CURRENT SPLIT</Text>
-          <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600', flexShrink: 1 }}>{split?.name}</Text>
         </View>
 
         <View style={styles.scheduleRow}>
@@ -161,6 +174,7 @@ export default function SplitsScreen() {
       </View>
 
       <View style={styles.splitList}>
+        {startError && <Text accessibilityRole="alert" style={{ color: '#FFB4A5', lineHeight: 20 }}>{startError}</Text>}
         {split?.days.map((day) => (
           <View key={day.id} style={styles.splitRow}>
             <View style={styles.splitInfo}>
@@ -171,8 +185,8 @@ export default function SplitsScreen() {
               <Text style={styles.weekdayButtonText}>{day.workoutDay.slice(0, 3)}</Text>
               <Text style={styles.chevron}>⌄</Text>
             </Pressable>
-            <Pressable accessibilityLabel={'Start ' + day.name} onPress={() => void startWorkout(day.id)} style={styles.playButton}>
-              <SymbolView name={{ ios: 'play.fill', android: 'play_arrow', web: 'play_arrow' }} size={17} tintColor={colors.text} />
+            <Pressable accessibilityRole="button" accessibilityState={{ disabled: startingId !== null, busy: startingId === day.id }} disabled={startingId !== null} accessibilityLabel={'Start ' + day.name} onPress={() => void startWorkout(day.id)} style={styles.playButton}>
+              {startingId === day.id ? <ActivityIndicator color={colors.text} /> : <SymbolView name={{ ios: 'play.fill', android: 'play_arrow', web: 'play_arrow' }} size={17} tintColor={colors.text} />}
             </Pressable>
             <Pressable accessibilityLabel={'Remove ' + day.name + ' from split'} onPress={() => void removeFromSplit(day.id)} style={styles.removeButton}>
               <Text style={styles.removeText}>×</Text>
@@ -204,19 +218,18 @@ export default function SplitsScreen() {
           const expanded = expandedId === workout.id;
           const editing = editingId === workout.id;
           const inSplit = Boolean(split?.days.some((day) => day.workoutId === workout.id));
-          const totalSets = workout.exercises.reduce((total, exercise) => total + (Number(exercise.sets) || 0), 0);
           return <View key={workout.id} style={styles.workoutCard}>
             <SymbolView name={{ ios: 'dumbbell.fill', android: 'fitness_center', web: 'fitness_center' }}
               size={76} tintColor={colors.accent} style={styles.watermark} />
-            <Pressable onPress={() => { animateLayout(); setExpandedId(expanded ? null : workout.id); setFilterQuery(''); }} style={styles.cardHeader}>
+            <Pressable onPress={() => { if (editing) return; animateLayout(); setExpandedId(expanded ? null : workout.id); setFilterQuery(''); }} style={styles.cardHeader}>
               <View style={styles.cardInfo}>
-                {editing ? <TextInput autoCapitalize="characters" onChangeText={(name) => updateWorkout(workout.id, { name })}
+                {editing ? <TextInput accessibilityLabel="Workout name" returnKeyType="done" onSubmitEditing={Keyboard.dismiss} autoCapitalize="characters" onChangeText={(name) => updateWorkout(workout.id, { name })}
                   style={styles.nameInput} value={workout.name} /> : <Text style={styles.workoutName}>{workout.name}</Text>}
-                <Text style={styles.workoutMeta}>{workout.exercises.length} EXERCISES · {totalSets} SETS</Text>
+                <Text style={styles.workoutMeta}>{workout.exercises.length} EXERCISES</Text>
               </View>
               <Pressable onPress={() => {
                 animateLayout();
-                if (editing) void saveWorkout(workout);
+                if (editing) { Keyboard.dismiss(); void saveWorkout(workout); }
                 setEditingId(editing ? null : workout.id);
                 setExpandedId(workout.id);
               }} style={[styles.editButton, editing && styles.editButtonActive]}>

@@ -5,7 +5,7 @@ import { useAuth } from '@/auth/provider';
 import * as Haptics from 'expo-haptics';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { StatusBar } from 'expo-status-bar';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/constants/theme';
 
@@ -23,26 +23,37 @@ type PillTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBa
 
 function PillTabBar({ state, descriptors, emitter, navigateToTab, insets }: PillTabBarProps) {
   const [barWidth, setBarWidth] = useState(0);
+  const [keyboardVisible, setKeyboardVisible] = useState(Keyboard.isVisible());
+  const visibleRoutes = state.routes.filter(route => Boolean(tabDetails[route.name]));
+  const selectedIndex = visibleRoutes.findIndex(route => route.key === state.routes[state.index]?.key);
   const activeIndex = useRef(new Animated.Value(state.index)).current;
   const innerWidth = Math.max(0, barWidth - BAR_HORIZONTAL_PADDING * 2);
-  const itemWidth = innerWidth > 0 ? innerWidth / state.routes.length : 0;
+  const itemWidth = innerWidth > 0 ? innerWidth / visibleRoutes.length : 0;
+
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   useEffect(() => {
     Animated.spring(activeIndex, {
-      toValue: state.index,
+      toValue: Math.max(0, selectedIndex),
       damping: 20,
       stiffness: 180,
       mass: 0.8,
       useNativeDriver: true,
     }).start();
-  }, [activeIndex, state.index]);
+  }, [activeIndex, selectedIndex]);
+
+  if (keyboardVisible) return null;
 
   return (
     <View
       onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}
       style={[styles.tabBar, { bottom: Math.max(insets.bottom, 14) }]}
     >
-      {itemWidth > 0 && (
+      {itemWidth > 0 && selectedIndex >= 0 && (
         <Animated.View
           pointerEvents="none"
           style={[
@@ -57,10 +68,10 @@ function PillTabBar({ state, descriptors, emitter, navigateToTab, insets }: Pill
         </Animated.View>
       )}
 
-      {state.routes.map((route, index) => {
+      {visibleRoutes.map((route, index) => {
         const details = tabDetails[route.name];
         const options = descriptors[route.key].options;
-        const focused = state.index === index;
+        const focused = selectedIndex === index;
         const color = focused ? colors.accent : colors.textMuted;
 
         const onPress = () => {
@@ -96,13 +107,13 @@ function PillTabBar({ state, descriptors, emitter, navigateToTab, insets }: Pill
 }
 
 export default function RootLayout() {
-  const { session } = useAuth();
-  if (session?.user.user_metadata.onboarding_complete !== true) return <Redirect href="/onboarding" />;
+  const { session, guest } = useAuth();
+  if (!session && !guest) return <Redirect href="/sign-in" />;
   return (
     <>
       <StatusBar style="light" />
       <Tabs
-        key={session.user.id}
+        key={session?.user.id ?? 'device-guest'}
         tabBar={(props) => <PillTabBar {...props} />}
         screenOptions={{
           headerShown: false,
@@ -116,6 +127,7 @@ export default function RootLayout() {
         <Tabs.Screen name="workout" options={{ title: 'Workout' }} />
         <Tabs.Screen name="history" options={{ title: 'History' }} />
         <Tabs.Screen name="progression" options={{ title: 'Progress' }} />
+        <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>
     </>
   );

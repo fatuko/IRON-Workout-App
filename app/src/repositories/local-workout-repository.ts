@@ -57,7 +57,7 @@ function createWorkoutExercise(exercise: PlannedExercise, previousExercise?: Wor
     repRange: exercise.target + ' ' + unitLabel,
     targetUnit: exercise.unit,
     lastPerformance: parsePreviousPerformance(exercise.pr),
-    restSeconds: exercise.unit === 'REPS' ? 120 : 60,
+    restSeconds: 120,
     previousSets: clone(previousExercise?.sets.filter((set) => set.complete) ?? []),
     sets: createSets(Math.max(1, Number(exercise.sets) || 1)),
   };

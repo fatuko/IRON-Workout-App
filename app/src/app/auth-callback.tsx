@@ -10,7 +10,7 @@ import { callbackDestination } from '@/auth/callback-destination';
 export default function AuthCallback() {
   const router = useRouter(), link = Linking.useURL();
   const { session } = useAuth();
-  const [destination, setDestination] = useState<'/' | '/onboarding' | '/reset-password' | null>(null);
+  const [destination, setDestination] = useState<'/' | '/reset-password' | null>(null);
   const handled = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -33,8 +33,7 @@ export default function AuthCallback() {
         if (!result) throw new Error('No confirmation was found in this link. Please open the latest email link.');
         if (result.error) throw new Error('This link is invalid or has expired. Please request a new email.');
         const destination = callbackDestination(values.get('type'),
-          'redirectType' in result.data ? result.data.redirectType : null,
-          result.data.user?.user_metadata.onboarding_complete === true);
+          'redirectType' in result.data ? result.data.redirectType : null);
         setDestination(destination);
       } catch (e) { setError(e instanceof Error ? e.message : 'Could not verify this link.'); }
     }

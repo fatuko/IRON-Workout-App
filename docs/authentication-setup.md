@@ -1,10 +1,12 @@
 # Account setup and verification
 
-## Screen preview while Supabase is unavailable
+Supabase is currently paused (reported by the project team). Live sign-in, signup, email verification, and account updates remain unverified until the project is resumed. Guest mode supports local workout development in the meantime.
 
-In an Expo development build, choose **Preview screens without an account** on Sign in. The banner labels every screen as preview and provides Exit preview. Signup uses sample fields; **Simulate email verification** opens the sample account and onboarding. You can build a split, open Profile, edit the sample name, and simulate changing a password. Preview sends no auth requests or emails and stores no passwords. Its workout data is held in a separate in-memory store and cleared on exit/reload. Production builds cannot activate preview (`__DEV__` guard). It does not test real authentication or email delivery.
+The app uses Supabase Auth for email/password accounts. First/last name and the rest-timer preference live in user metadata; the join date comes from `user.created_at`. Metadata is not an authorization mechanism.
 
-The app uses Supabase Auth for email/password accounts. First/last name and the onboarding preference live in user metadata; the join date comes from `user.created_at`. Metadata is not an authorization mechanism.
+## Guest access
+
+Continue as guest opens Home without creating a Supabase session. Guest workouts persist locally in a separate device-guest store and do not merge into signed-in accounts. Profile offers a return to sign-in; account settings remain sign-in-only.
 
 ## Local configuration
 
@@ -36,7 +38,7 @@ Type checking and export do not verify the hosted Auth configuration. Before shi
 
 1. Signup validation; confirmation email; expired link; resend; return to app on web and native.
 2. Login with invalid credentials and with an unconfirmed email.
-3. First login opens split setup; Create opens the split builder; Skip opens Home with an empty split.
+3. Verified accounts open Home directly with an empty split; create workouts from Splits.
 4. Force-close/reopen restores the session and local split; names/join date match the signed-in account.
 5. Password reset email opens the new-password form on cold and warm launches; old password stops working.
 6. Name changes persist; sign-out removes access to protected routes, including browser back navigation.

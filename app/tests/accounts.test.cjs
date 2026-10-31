@@ -5,11 +5,11 @@ const { validateEmail, validateName, validatePassword } = require('../src/auth/v
 const { profileStats } = require('../src/utils/profile-stats.ts');
 const { createLocalWorkoutRepository } = require('../src/repositories/local-workout-repository.ts');
 const { callbackDestination } = require('../src/auth/callback-destination.ts');
+const { loadWorkoutPage } = require('../src/utils/resolve-workout.ts');
 test('password recovery opens reset for fragment and PKCE links', () => {
-  assert.equal(callbackDestination('recovery', null, true), '/reset-password');
-  assert.equal(callbackDestination(null, 'recovery', true), '/reset-password');
-  assert.equal(callbackDestination(null, null, false), '/onboarding');
-  assert.equal(callbackDestination(null, null, true), '/');
+  assert.equal(callbackDestination('recovery', null), '/reset-password');
+  assert.equal(callbackDestination(null, 'recovery'), '/reset-password');
+  assert.equal(callbackDestination(null, null), '/');
 });
 test('signup rejects missing names, malformed email, weak and mismatched passwords', () => {
   assert.ok(validateName(' ', 'Last'));
@@ -62,4 +62,74 @@ test('failed storage writes reject and roll back in-memory changes', async () =>
   const repo = createLocalWorkoutRepository('user', { getItem: () => null, setItem: () => { throw new Error('Storage full'); } });
   await assert.rejects(repo.saveWorkoutTemplate({ id: 'x', name: 'Push', exercises: [] }), /Storage full/);
   assert.deepEqual(await repo.getWorkoutTemplates(), []);
+});
+
+test('a scheduled empty workout starts after its edited template is saved', async () => {
+  const data = new Map();
+  const repo = createLocalWorkoutRepository('play-regression', { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value) });
+  const template = { id: 'push', name: 'Push', color: '#FF3D00', exercises: [] };
+  await repo.saveWorkoutTemplate(template);
+  const split = await repo.getActiveSplit();
+  const scheduled = await repo.addWorkoutToSplit(split.id, template.id, 'MONDAY');
+  const day = scheduled.days[0];
+  await assert.rejects(repo.startWorkout(day.id), /no exercises/);
+  await repo.saveWorkoutTemplate({ ...template, exercises: [
+    { id: 'bench', name: 'Bench', sets: '3', target: '8–12', unit: 'REPS', pr: 'NO PR YET' },
+  ] });
+  const session = await repo.startWorkout(day.id);
+  assert.equal(session.exercises[0].sets.length, 3);
+  assert.equal((await repo.getWorkout(session.id)).status, 'draft');
+  assert.equal((await repo.startWorkout(day.id)).id, session.id);
+  assert.equal((await loadWorkoutPage(repo, 'stale-session-id')).session.id, session.id);
+  assert.equal((await loadWorkoutPage(repo, session.id)).session.id, session.id);
+});
+
+test('today preloads without starting a session and ignores stale links', async () => {
+  const repo = createLocalWorkoutRepository('missing-session', { getItem: () => null, setItem: () => {} });
+  await repo.saveWorkoutTemplate({ id: 'push', name: 'Push', color: '#FF3D00', exercises: [
+    { id: 'bench', name: 'Bench', sets: '3', target: '8', unit: 'REPS', pr: '' },
+  ] });
+  const split = await repo.getActiveSplit();
+  await repo.addWorkoutToSplit(split.id, 'push', 'MONDAY');
+  assert.equal((await loadWorkoutPage(repo, 'missing', new Date(2026, 9, 26, 12))).kind, 'ready');
+  assert.equal(await repo.getDraftWorkout(), null);
+  assert.equal((await loadWorkoutPage(repo, undefined, new Date(2026, 9, 27, 12))).kind, 'rest');
+});
+
+test('daily workout states use local weekdays and completion dates, including multiple plans', async () => {
+  const now = new Date(2026, 9, 26, 12);
+  const day = { id: 'monday', workoutDay: 'MONDAY' };
+  let history = [];
+  let days = [day, { id: 'tuesday', workoutDay: 'TUESDAY' }];
+  const repo = {
+    getWorkout: async () => history[0] ?? null,
+    getDraftWorkout: async () => null,
+    getActiveSplit: async () => ({ days, nextDayIndex: 1 }),
+    getWorkoutHistory: async () => history,
+  };
+  assert.equal((await loadWorkoutPage(repo, undefined, now)).day.id, 'monday');
+  history = [{ status: 'completed', splitDayId: 'monday', completedAt: new Date(2026, 9, 26, 8).toISOString() }];
+  assert.equal((await loadWorkoutPage(repo, 'completed-session', now)).kind, 'done');
+  days.push({ id: 'evening', workoutDay: 'MONDAY' });
+  assert.equal((await loadWorkoutPage(repo, undefined, now)).day.id, 'evening');
+  days = [day];
+  history[0].completedAt = new Date(2026, 9, 25, 23).toISOString();
+  assert.equal((await loadWorkoutPage(repo, undefined, now)).kind, 'ready');
+  assert.equal((await loadWorkoutPage(repo, undefined, new Date(2026, 9, 27, 12))).kind, 'rest');
+  repo.getDraftWorkout = async () => ({ id: 'ongoing', status: 'draft' });
+  assert.equal((await loadWorkoutPage(repo, undefined, now)).session.id, 'ongoing');
+});
+
+test('one rest timer preference validates minutes and seconds and defaults safely', () => {
+  const { restTimerSeconds, parseRestTimer, formatRestTimer } = require('../src/utils/rest-timer.ts');
+  assert.equal(restTimerSeconds(undefined), 120);
+  assert.equal(restTimerSeconds(90), 90);
+  assert.equal(restTimerSeconds(-1), 120);
+  assert.equal(parseRestTimer('1', '30'), 90);
+  assert.equal(parseRestTimer('0', '05'), 5);
+  assert.equal(parseRestTimer('60', '00'), 3600);
+  for (const [minutes, seconds] of [['0', '0'], ['1', '60'], ['61', '00'], ['', '30'], ['1.5', '00'], ['-1', '30']]) {
+    assert.equal(parseRestTimer(minutes, seconds), null);
+  }
+  assert.equal(formatRestTimer(90), '1:30');
 });

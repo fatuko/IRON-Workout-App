@@ -69,8 +69,8 @@ function getPersonalRecords(history: WorkoutSession[]): PersonalRecord[] {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { session } = useAuth();
-  const firstName = readName(session?.user.user_metadata.first_name) || 'Athlete';
+  const { session, guest } = useAuth();
+  const firstName = readName(session?.user.user_metadata.first_name) || (guest ? 'Guest' : 'Athlete');
   const [split, setSplit] = useState<WorkoutSplit | null>(null);
   const [history, setHistory] = useState<WorkoutSession[]>([]);
   const [loading, setLoading] = useState(true);
