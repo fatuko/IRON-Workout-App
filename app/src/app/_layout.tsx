@@ -20,7 +20,7 @@ const tabDetails: Record<string, { label: string; icon: SymbolViewProps['name'] 
 
 type PillTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
-function PillTabBar({ state, descriptors, navigation, insets }: PillTabBarProps) {
+function PillTabBar({ state, descriptors, emitter, navigateToTab, insets }: PillTabBarProps) {
   const [barWidth, setBarWidth] = useState(0);
   const activeIndex = useRef(new Animated.Value(state.index)).current;
   const innerWidth = Math.max(0, barWidth - BAR_HORIZONTAL_PADDING * 2);
@@ -64,14 +64,14 @@ function PillTabBar({ state, descriptors, navigation, insets }: PillTabBarProps)
 
         const onPress = () => {
           void Haptics.selectionAsync();
-          const event = navigation.emit({
+          const event = emitter.emit({
             type: 'tabPress',
             target: route.key,
             canPreventDefault: true,
           });
 
           if (!focused && !event.defaultPrevented) {
-            navigation.navigate(route.name, route.params);
+            navigateToTab(route.key);
           }
         };
 
@@ -81,7 +81,7 @@ function PillTabBar({ state, descriptors, navigation, insets }: PillTabBarProps)
             accessibilityRole="button"
             accessibilityState={focused ? { selected: true } : {}}
             accessibilityLabel={options.tabBarAccessibilityLabel ?? details.label}
-            onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
+            onLongPress={() => emitter.emit({ type: 'tabLongPress', target: route.key })}
             onPress={onPress}
             style={({ pressed }) => [styles.tabItem, pressed && styles.tabItemPressed]}
           >
