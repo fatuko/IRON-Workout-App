@@ -4,11 +4,18 @@ import type { WorkoutRepository } from './workout-repository';
 export type { WorkoutRepository } from './workout-repository';
 let userId: string | null = null;
 let repository: WorkoutRepository | null = null;
-export function setWorkoutUser(next: string | null) {
+let previewData = new Map<string, string>();
+// Old repositories keep their old map; late saves cannot repopulate a new preview.
+export function clearPreviewWorkouts() { previewData = new Map(); }
+export function setWorkoutUser(next: string | null, preview = false) {
   if (next === userId) return;
   repository = null;
   userId = null;
-  if (next) { repository = createLocalWorkoutRepository(next, storage); userId = next; }
+  if (next) {
+    const data = previewData;
+    const previewStorage = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); } };
+    repository = createLocalWorkoutRepository(next, preview ? previewStorage : storage); userId = next;
+  }
 }
 export const workoutRepository = new Proxy({} as WorkoutRepository, {
   get(_target, property: keyof WorkoutRepository) {

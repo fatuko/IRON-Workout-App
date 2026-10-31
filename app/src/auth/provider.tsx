@@ -2,14 +2,23 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { AppState, Platform } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { setWorkoutUser } from '@/repositories';
+import { setWorkoutUser, clearPreviewWorkouts } from '@/repositories';
+import { getPreview, subscribePreview } from './preview';
 
-const Context = createContext<{ session: Session | null; loading: boolean; error: string | null }>({ session: null, loading: true, error: null });
+const Context = createContext<{ session: Session | null; loading: boolean; error: string | null; preview: boolean }>({ session: null, loading: true, error: null, preview: false });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState(getPreview());
+  useEffect(() => subscribePreview(() => {
+    const next = getPreview();
+    setWorkoutUser(null);
+    if (!next.enabled) clearPreviewWorkouts();
+    setWorkoutUser(next.enabled ? next.session?.user.id ?? null : session?.user.id ?? null, next.enabled);
+    setPreview(next);
+  }), [session]);
   useEffect(() => {
     if (!supabase) { setLoading(false); return; }
     let active = true;
@@ -17,7 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     function apply(next: Session | null) {
       if (!active) return;
       try {
-        setWorkoutUser(next?.user.id ?? null);
+        if (!getPreview().enabled) setWorkoutUser(next?.user.id ?? null);
         setSession(next);
         setError(null);
       } catch {
@@ -42,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const listener = AppState.addEventListener('change', refresh);
     return () => { active = false; subscription.unsubscribe(); listener.remove(); if (Platform.OS !== 'web') supabase!.auth.stopAutoRefresh(); };
   }, []);
-  return <Context.Provider value={{ session, loading, error }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ session: preview.enabled ? preview.session : session, loading: preview.enabled ? false : loading, error: preview.enabled ? null : error, preview: preview.enabled }}>{children}</Context.Provider>;
 }
 
 export const useAuth = () => useContext(Context);

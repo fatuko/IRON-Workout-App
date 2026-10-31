@@ -1,15 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { AccountPage, Field, Action, Notice } from '@/components/account-ui';
 import { authClient, supabase } from '@/lib/supabase';
 import { validateEmail, validateName, validatePassword } from '@/auth/validation';
+import { useAuth } from '@/auth/provider';
 import { emailRedirect } from '@/auth/redirect';
 
 export default function SignUp() {
   const router = useRouter();
+  const { preview } = useAuth();
   const [first, setFirst] = useState(''), [last, setLast] = useState(''), [email, setEmail] = useState('');
   const [password, setPassword] = useState(''), [confirmation, setConfirmation] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
+  useEffect(() => { if (preview) { setFirst('Alex'); setLast('Morgan'); setEmail('alex@example.com'); setPassword('preview-only'); setConfirmation('preview-only'); } else { setFirst(''); setLast(''); setEmail(''); setPassword(''); setConfirmation(''); } }, [preview]);
   async function submit() {
     const invalid = validateName(first, last) || validateEmail(email) || validatePassword(password, confirmation);
     if (invalid) return setError(invalid);
@@ -31,8 +34,8 @@ export default function SignUp() {
     <Notice text="Use at least 8 characters." />
     <Field label="Confirm password" password value={confirmation} onChangeText={setConfirmation} autoComplete="new-password" />
     <Notice error text={error} />
-    {!supabase && <Notice text="Account services are being set up. Signup will be available soon." />}
-    <Action title="Create account" busy={busy} disabled={!supabase} onPress={() => void submit()} />
+    {!supabase && !preview && <Notice text="Account services are being set up. Signup will be available soon." />}
+    <Action title="Create account" busy={busy} disabled={!supabase && !preview} onPress={() => void submit()} />
     <Action title="Already have an account? Sign in" secondary onPress={() => router.replace('/sign-in')} />
   </AccountPage>;
 }

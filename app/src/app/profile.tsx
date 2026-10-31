@@ -8,7 +8,7 @@ import { workoutRepository } from '@/repositories';
 import { profileStats } from '@/utils/profile-stats';
 
 export default function Profile() {
-  const { session } = useAuth(), router = useRouter();
+  const { session, preview } = useAuth(), router = useRouter();
   const user = session!.user;
   const [stats, setStats] = useState<ReturnType<typeof profileStats> | null>(null), [error, setError] = useState<string | null>(null);
   useFocusEffect(useCallback(() => {
@@ -26,7 +26,7 @@ export default function Profile() {
     </View>
     <Notice error text={error} />
     <Notice text={stats?.workouts === 0 ? 'Complete your first workout to start tracking your progress.' : 'Keep your weekly streak with at least one completed workout each week.'} />
-    <Notice text="Workout stats are saved on this device. Cloud sync is not available yet." />
+    <Notice text={preview ? "Preview stats use temporary sample activity and disappear when you exit." : "Workout stats are saved on this device. Cloud sync is not available yet."} />
     <Action title="Account settings" onPress={() => router.push('/account-settings')} />
     <Action title="Back to training" secondary onPress={() => router.replace('/')} />
   </AccountPage>;

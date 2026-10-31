@@ -5,7 +5,7 @@ import { authClient } from '@/lib/supabase';
 import { useAuth } from '@/auth/provider';
 import { validatePassword } from '@/auth/validation';
 export default function ResetPassword() {
-  const router = useRouter(), { session } = useAuth();
+  const router = useRouter(), { session, preview } = useAuth();
   const [password, setPassword] = useState(''), [confirmation, setConfirmation] = useState('');
   const [busy, setBusy] = useState(false), [saved, setSaved] = useState(false), [error, setError] = useState<string | null>(null);
   async function submit() {
@@ -14,7 +14,7 @@ export default function ResetPassword() {
     try { const { error } = await authClient().updateUser({ password }); if (error) throw error; setPassword(''); setConfirmation(''); setSaved(true); }
     catch (e) { setError(e instanceof Error ? e.message : 'Could not change your password.'); } finally { setBusy(false); }
   }
-  return <AccountPage title={saved ? 'Password updated.' : 'Choose a new password.'} subtitle={saved ? 'You’re ready to get back to training.' : 'Use at least 8 characters.'}>
+  return <AccountPage title={saved ? (preview ? 'Password change previewed.' : 'Password updated.') : 'Choose a new password.'} subtitle={saved ? (preview ? 'No password was changed or stored.' : 'You’re ready to get back to training.') : 'Use at least 8 characters.'}>
     {!saved && <><Field label="New password" password value={password} onChangeText={setPassword} autoComplete="new-password" />
       <Field label="Confirm new password" password value={confirmation} onChangeText={setConfirmation} autoComplete="new-password" />
       <Notice error text={error} /><Action title="Save password" busy={busy} onPress={() => void submit()} /></>}

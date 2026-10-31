@@ -6,13 +6,13 @@ import { AccountPage, Field, Action, Notice } from '@/components/account-ui';
 import { authClient } from '@/lib/supabase';
 
 export default function AccountSettings() {
-  const { session } = useAuth(), router = useRouter();
+  const { session, preview } = useAuth(), router = useRouter();
   const [first, setFirst] = useState(readName(session?.user.user_metadata.first_name)), [last, setLast] = useState(readName(session?.user.user_metadata.last_name));
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [notice, setNotice] = useState<string | null>(null);
   async function save() {
     const invalid = validateName(first, last); if (invalid) return setError(invalid);
     setBusy(true); setError(null); setNotice(null);
-    try { const { error } = await authClient().updateUser({ data: { first_name: first.trim(), last_name: last.trim() } }); if (error) throw error; setNotice('Your name has been updated.'); }
+    try { const { error } = await authClient().updateUser({ data: { first_name: first.trim(), last_name: last.trim() } }); if (error) throw error; setNotice(preview ? 'Sample name updated for this preview only.' : 'Your name has been updated.'); }
     catch (e) { setError(e instanceof Error ? e.message : 'Could not save your name.'); } finally { setBusy(false); }
   }
   async function signOut() {

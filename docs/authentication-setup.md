@@ -1,5 +1,9 @@
 # Account setup and verification
 
+## Screen preview while Supabase is unavailable
+
+In an Expo development build, choose **Preview screens without an account** on Sign in. The banner labels every screen as preview and provides Exit preview. Signup uses sample fields; **Simulate email verification** opens the sample account and onboarding. You can build a split, open Profile, edit the sample name, and simulate changing a password. Preview sends no auth requests or emails and stores no passwords. Its workout data is held in a separate in-memory store and cleared on exit/reload. Production builds cannot activate preview (`__DEV__` guard). It does not test real authentication or email delivery.
+
 The app uses Supabase Auth for email/password accounts. First/last name and the onboarding preference live in user metadata; the join date comes from `user.created_at`. Metadata is not an authorization mechanism.
 
 ## Local configuration
