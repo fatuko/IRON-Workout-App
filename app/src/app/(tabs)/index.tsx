@@ -3,6 +3,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { useAuth } from '@/auth/provider';
+import { readName } from '@/auth/validation';
+
 import { colors, spacing, typography } from '@/constants/theme';
 import { workoutRepository } from '@/repositories';
 import type { WorkoutSession, WorkoutSplit } from '@/types/workout';
@@ -66,6 +69,8 @@ function getPersonalRecords(history: WorkoutSession[]): PersonalRecord[] {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { session } = useAuth();
+  const firstName = readName(session?.user.user_metadata.first_name) || 'Athlete';
   const [split, setSplit] = useState<WorkoutSplit | null>(null);
   const [history, setHistory] = useState<WorkoutSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,10 +144,10 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.eyebrow}>{getGreeting(now)}</Text>
-          <Text style={styles.greeting}>KIITE</Text>
+          <Text style={styles.greeting}>{firstName.toUpperCase()}</Text>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open profile" style={styles.profile}>
-          <Text style={styles.profileText}>K</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open profile" onPress={() => router.push('/profile')} style={styles.profile}>
+          <Text style={styles.profileText}>{firstName.charAt(0).toUpperCase()}</Text>
         </Pressable>
       </View>
 

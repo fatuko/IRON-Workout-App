@@ -16,62 +16,23 @@ const createId = (prefix: string) =>
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
-const starterExercises = {
-  push: [
-    { id: 'bench', name: 'Incline Chest Press', sets: '3', target: '8–12', unit: 'REPS', pr: '185 LB × 8' },
-    { id: 'shoulder', name: 'Shoulder Press', sets: '3', target: '6–10', unit: 'REPS', pr: '90 LB × 10' },
-    { id: 'fly', name: 'Cable Fly', sets: '3', target: '10–15', unit: 'REPS', pr: '35 LB × 14' },
-    { id: 'raise', name: 'Lateral Raise', sets: '3', target: '12–20', unit: 'REPS', pr: '60 LB × 15' },
-    { id: 'pushdown', name: 'Tricep Pushdown', sets: '3', target: '10–15', unit: 'REPS', pr: '130 LB × 12' },
-    { id: 'extension', name: 'Overhead Extension', sets: '3', target: '10–15', unit: 'REPS', pr: '50 LB × 14' },
-  ],
-  pull: [
-    { id: 'pulldown', name: 'Lat Pulldown', sets: '3', target: '6–10', unit: 'REPS', pr: '150 LB × 8' },
-    { id: 'row', name: 'Chest-Supported Row', sets: '3', target: '8–12', unit: 'REPS', pr: '135 LB × 10' },
-    { id: 'curl', name: 'Preacher Curl', sets: '3', target: '8–12', unit: 'REPS', pr: '65 LB × 9' },
-  ],
-  legs: [
-    { id: 'squat', name: 'Hack Squat', sets: '4', target: '6–10', unit: 'REPS', pr: '270 LB × 7' },
-    { id: 'leg-curl', name: 'Seated Leg Curl', sets: '3', target: '8–12', unit: 'REPS', pr: '120 LB × 10' },
-    { id: 'calf', name: 'Standing Calf Raise', sets: '4', target: '10–15', unit: 'REPS', pr: '180 LB × 12' },
-  ],
-} satisfies Record<string, PlannedExercise[]>;
-
-let workoutTemplates: WorkoutTemplate[] = [
-  { id: 'push', name: 'PUSH A', color: '#FF3D00', exercises: starterExercises.push },
-  { id: 'push-b', name: 'PUSH B', color: '#FF8A00', exercises: [
-    { id: 'flat-press', name: 'Flat Chest Press', sets: '3', target: '6–10', unit: 'REPS', pr: 'NO PR YET' },
-    { id: 'arnold-press', name: 'Arnold Press', sets: '3', target: '8–12', unit: 'REPS', pr: 'NO PR YET' },
-    { id: 'skull-crusher', name: 'Skull Crusher', sets: '3', target: '10–12', unit: 'REPS', pr: 'NO PR YET' },
-  ] },
-  { id: 'pull', name: 'PULL DAY', color: '#9B6DFF', exercises: starterExercises.pull },
-  { id: 'legs', name: 'LEGS A', color: '#368DFF', exercises: starterExercises.legs },
-  { id: 'legs-b', name: 'LEGS B', color: '#4ECB71', exercises: [
-    { id: 'rdl', name: 'Romanian Deadlift', sets: '4', target: '6–10', unit: 'REPS', pr: 'NO PR YET' },
-    { id: 'hip-thrust', name: 'Hip Thrust', sets: '4', target: '8–12', unit: 'REPS', pr: 'NO PR YET' },
-    { id: 'walking-lunge', name: 'Walking Lunge', sets: '3', target: '10–12', unit: 'REPS', pr: 'NO PR YET' },
-  ] },
-];
-
+export function createLocalWorkoutRepository(userId: string, storage: { getItem(key: string): string | null; setItem(key: string, value: string): void }): WorkoutRepository {
+const key = 'iron.workouts.v1.' + userId;
+const saved = storage.getItem(key);
+const state = saved ? JSON.parse(saved) : null;
+if (state && (!Array.isArray(state.templates) || !Array.isArray(state.sessions) || !Array.isArray(state.split?.days))) {
+  throw new Error('Saved workout data is invalid');
+}
+let workoutTemplates: WorkoutTemplate[] = state?.templates ?? [];
+let activeSplit: WorkoutSplit = state?.split ?? {
+  id: 'split-' + userId, name: 'My split', isActive: true, nextDayIndex: 0, days: [],
+};
+const sessions = new Map<string, WorkoutSession>((state?.sessions ?? []).map((session: WorkoutSession) => [session.id, session]));
 function scheduleWorkout(workoutId: string, workoutDay: Weekday, id = createId('scheduled')): SplitDay {
   const workout = workoutTemplates.find((item) => item.id === workoutId);
   if (!workout) throw new Error('Workout template not found');
   return { id, workoutId, workoutDay, name: workout.name, color: workout.color, exercises: clone(workout.exercises) };
 }
-
-let activeSplit: WorkoutSplit = {
-  id: 'starter-split',
-  name: 'Push Pull Legs',
-  isActive: true,
-  nextDayIndex: 0,
-  days: [
-    scheduleWorkout('push', 'MONDAY', 'scheduled-push'),
-    scheduleWorkout('pull', 'TUESDAY', 'scheduled-pull'),
-    scheduleWorkout('legs', 'WEDNESDAY', 'scheduled-legs'),
-  ],
-};
-
-const sessions = new Map<string, WorkoutSession>();
 
 function parsePreviousPerformance(pr: string) {
   return pr === 'NO PR YET' ? 'No previous performance' : 'Previous best: ' + pr;
@@ -102,7 +63,7 @@ function createWorkoutExercise(exercise: PlannedExercise, previousExercise?: Wor
   };
 }
 
-export class MockWorkoutRepository implements WorkoutRepository {
+class LocalWorkoutRepository implements WorkoutRepository {
   async getActiveSplit() {
     return clone(activeSplit);
   }
@@ -298,4 +259,32 @@ export class MockWorkoutRepository implements WorkoutRepository {
   }
 }
 
-export const workoutRepository: WorkoutRepository = new MockWorkoutRepository();
+const repository = new LocalWorkoutRepository();
+const mutations = new Set(['saveActiveSplit', 'deleteSplitDay', 'addWorkoutToSplit', 'saveWorkoutTemplate', 'deleteWorkoutTemplate', 'startWorkout', 'saveWorkoutSet', 'deleteWorkoutSet', 'finishWorkout']);
+// Each instance closes over one account. In-flight calls cannot switch owners.
+let queue: Promise<unknown> = Promise.resolve();
+return new Proxy(repository, {
+  get(target, property: keyof WorkoutRepository) {
+    const method = target[property];
+    if (typeof method !== 'function') return method;
+    return (...args: unknown[]) => {
+      const run = queue.then(async () => {
+        const before = mutations.has(property) ? clone({ templates: workoutTemplates, split: activeSplit, sessions: [...sessions.values()] }) : null;
+        try {
+          const result = await Reflect.apply(method, target, args);
+          if (before) storage.setItem(key, JSON.stringify({ templates: workoutTemplates, split: activeSplit, sessions: [...sessions.values()] }));
+          return result;
+        } catch (error) {
+          if (before) {
+            workoutTemplates = before.templates; activeSplit = before.split;
+            sessions.clear(); before.sessions.forEach(session => sessions.set(session.id, session));
+          }
+          throw error;
+        }
+      });
+      queue = run.catch(() => undefined);
+      return run;
+    };
+  },
+});
+}

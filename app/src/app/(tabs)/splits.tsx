@@ -144,6 +144,7 @@ export default function SplitsScreen() {
       <View style={styles.sectionPanel}>
         <View style={styles.sectionHeader}>
           <Text style={styles.currentTitle}>CURRENT SPLIT</Text>
+          <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600', flexShrink: 1 }}>{split?.name}</Text>
         </View>
 
         <View style={styles.scheduleRow}>
