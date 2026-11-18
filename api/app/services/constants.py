@@ -28,9 +28,8 @@ STRENGTH_VOLUME_ANCHOR_SETS_PER_WEEK = 6
 
 STRENGTH_VOLUME_PLATEAU_SETS_PER_WEEK = 4
 
-# TODO: remmert2025 full text has the per-session set cap
-# ("point of undetectable outcome superiority"). Placeholder until read.
-MAX_SETS_PER_MUSCLE_PER_SESSION = None  # basis: remmert2025 (unread)
+
+MAX_SETS_PER_MUSCLE_PER_SESSION = 11  # basis: remmert2025 
 
 
 # ---------------------------------------------------------------------------
