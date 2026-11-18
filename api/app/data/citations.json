@@ -28,8 +28,8 @@
     "url": "https://sportrxiv.org/index.php/server/preprint/view/537",
     "type": "preprint",
     "access": "abstract",
-    "finding": "Identifies a per-session set count beyond which additional sets stop producing a likely-meaningful difference.",
-    "caveats": "Preprint, not peer reviewed. Full text not yet read; the specific cap value is still a placeholder in constants.py."
+    "finding": "Identifies a per-session set count (11) beyond which additional sets stop producing a likely-meaningful difference.",
+    "caveats": "Preprint, not peer reviewed. The 11-set per-session value is used as a soft threshold, not a hard cap. Treat it as provisional until the paper is peer reviewed."
   },
 
   "schoenfeld2017": {
