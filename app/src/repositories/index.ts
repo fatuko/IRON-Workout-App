@@ -1,4 +1,4 @@
-import { storage } from '@/lib/storage';
+import { storage } from '../lib/storage';
 import { createLocalWorkoutRepository } from './local-workout-repository';
 import type { WorkoutRepository } from './workout-repository';
 export type { WorkoutRepository } from './workout-repository';

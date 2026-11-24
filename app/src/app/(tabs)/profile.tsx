@@ -1,3 +1,4 @@
+import type { User } from '@supabase/supabase-js';
 import { useCallback, useState, useRef } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -15,19 +16,12 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 export default function Profile() {
-  const { session, leaveGuest } = useAuth();
-  if (session) return <MemberProfile />;
-  return <ScrollView style={styles.screen} contentContainerStyle={styles.page}>
-    <Text style={styles.heading}>GUEST</Text>
-    <Text style={styles.label}>Workouts are saved on this device.</Text>
-    <Pressable accessibilityRole="button" onPress={leaveGuest} style={styles.edit}><Text style={styles.editText}>Sign in / Create account</Text></Pressable>
-  </ScrollView>;
+  const { session } = useAuth();
+  return session ? <MemberProfile user={session.user} /> : null;
 }
 
-function MemberProfile() {
-  const { session } = useAuth();
+function MemberProfile({ user }: { user: User }) {
   const router = useRouter();
-  const user = session!.user;
   const [editingMember, setEditingMember] = useState(false);
   const [editingTimer, setEditingTimer] = useState(false);
   const [first, setFirst] = useState('');

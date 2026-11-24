@@ -1,12 +1,8 @@
 # Account setup and verification
 
-Supabase is currently paused (reported by the project team). Live sign-in, signup, email verification, and account updates remain unverified until the project is resumed. Guest mode supports local workout development in the meantime.
+The project team restored the hosted Supabase project. Live sign-in, signup, email verification, and account updates still need verification.
 
-The app uses Supabase Auth for email/password accounts. First/last name and the rest-timer preference live in user metadata; the join date comes from `user.created_at`. Metadata is not an authorization mechanism.
-
-## Guest access
-
-Continue as guest opens Home without creating a Supabase session. Guest workouts persist locally in a separate device-guest store and do not merge into signed-in accounts. Profile offers a return to sign-in; account settings remain sign-in-only.
+The app requires a Supabase session to access workouts and uses email/password accounts. First/last name and the rest-timer preference live in user metadata; the join date comes from `user.created_at`. Metadata is not an authorization mechanism.
 
 ## Local configuration
 
@@ -14,12 +10,12 @@ Copy `app/.env.example` to `app/.env.local`. In Supabase's Connect dialog, copy 
 
 In Supabase Authentication:
 
-- Enable Email signup and email confirmation.
+- Enable Email signup and email confirmation. In Authentication → Emails → Confirm sign up, use an email body such as `<p>Your IRON verification code is <strong>{{ .Token }}</strong>.</p>`. Expo verifies the code directly with Supabase.
 - Set the minimum password length to at least 8 characters, matching the app's validation.
 - Add `ironworkout://auth-callback` to the redirect allowlist for installed development/production builds.
 - Add the exact web callback URL for the port in use, e.g. `http://localhost:8082/auth-callback`, plus the production HTTPS callback when deployed.
 - Expo Go has a different generated `exp://.../--/auth-callback` URL. Use a development build with the registered scheme for reliable mobile email-link testing, or allowlist the exact Expo Go development URL.
-- Keep email templates pointing to Supabase's confirmation URL. The app consumes returned session tokens on the callback route; it also supports exchanging a returned PKCE code.
+- Keep password-reset and email-change templates pointing to Supabase's confirmation URL. The app consumes returned session tokens on the callback route; it also supports exchanging a returned PKCE code.
 - Configure production email delivery before public signup. Supabase's default email service has delivery and rate restrictions.
 
 No database migration is required for this auth UI. Workout plans and sessions are stored **on the device**, separated by Supabase user ID, with no seeded sample records. They do not sync between devices. Cloud persistence, database RLS, and backend JWT verification remain separate work.
@@ -36,7 +32,7 @@ npx expo export --platform web
 
 Type checking and export do not verify the hosted Auth configuration. Before shipping, use test accounts to check:
 
-1. Signup validation; confirmation email; expired link; resend; return to app on web and native.
+1. Signup validation; confirmation email; valid and expired codes; resend; verification on web and native.
 2. Login with invalid credentials and with an unconfirmed email.
 3. Verified accounts open Home directly with an empty split; create workouts from Splits.
 4. Force-close/reopen restores the session and local split; names/join date match the signed-in account.
