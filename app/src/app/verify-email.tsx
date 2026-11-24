@@ -9,23 +9,39 @@ export default function VerifyEmail() {
   const params = useLocalSearchParams<{ email?: string }>();
   const router = useRouter();
   const [email, setEmail] = useState(typeof params.email === 'string' ? params.email : '');
+  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false), [cooldown, setCooldown] = useState(0);
   const [notice, setNotice] = useState<string | null>(null), [error, setError] = useState<string | null>(null);
   useEffect(() => { if (!cooldown) return; const timer = setTimeout(() => setCooldown(cooldown - 1), 1000); return () => clearTimeout(timer); }, [cooldown]);
+  async function verify() {
+    const invalid = validateEmail(email);
+    if (invalid) return setError(invalid);
+    if (!/^\d{6,10}$/.test(code.trim())) return setError('Enter the verification code from your email.');
+    setBusy(true); setError(null); setNotice(null);
+    try {
+      const { error } = await authClient().verifyOtp({ email: email.trim(), token: code.trim(), type: 'email' });
+      if (error) throw error;
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not verify the code.'); }
+    finally { setBusy(false); }
+  }
+
   async function resend() {
     const invalid = validateEmail(email); if (invalid) return setError(invalid);
     setBusy(true); setError(null); setNotice(null);
     try {
       const { error } = await authClient().resend({ type: 'signup', email: email.trim(), options: { emailRedirectTo: emailRedirect() } });
       if (error) throw error;
-      setNotice('If this account needs confirmation, a new link is on its way. Check your spam folder too.'); setCooldown(60);
+      setCode('');
+      setNotice('If this account needs confirmation, a new email is on its way. Check your spam folder too.'); setCooldown(60);
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not resend the email.'); }
     finally { setBusy(false); }
   }
-  return <AccountPage glass title="Check your inbox." subtitle="Open the confirmation link in your email to verify your account. If you already have an account, sign in instead.">
-    <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoComplete="email" />
+  return <AccountPage glass title="Check your inbox." subtitle="Open the confirmation link in your email or enter the verification code if one was included.">
+    <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoComplete="email" editable={!busy} />
+    <Field label="Verification code" value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" maxLength={10} editable={!busy} />
     <Notice text={notice} /><Notice text={error} error />
-    <Action title={cooldown ? `Resend in ${cooldown}s` : 'Resend confirmation'} busy={busy} disabled={cooldown > 0} onPress={() => void resend()} />
+    <Action title="Verify email" busy={busy} disabled={!code.trim()} onPress={() => void verify()} />
+    <Action title={cooldown ? `Resend in ${cooldown}s` : 'Resend verification email'} secondary disabled={busy || cooldown > 0} onPress={() => void resend()} />
     <Action title="Use a different email to sign up" secondary onPress={() => router.replace('/sign-up')} />
     <Action title="Back to sign in" secondary onPress={() => router.replace('/sign-in')} />
   </AccountPage>;

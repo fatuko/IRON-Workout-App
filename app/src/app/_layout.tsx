@@ -17,6 +17,8 @@ function Routes() {
   return <View style={{ flex: 1 }}><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
     <Stack.Protected guard={!session}>
       <Stack.Screen name="sign-in" /><Stack.Screen name="sign-up" /><Stack.Screen name="verify-email" />
+    </Stack.Protected>
+    <Stack.Protected guard={!!session}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="account-settings" />

@@ -12,10 +12,32 @@ export default function AuthCallback() {
   const { session } = useAuth();
   const [destination, setDestination] = useState<'/' | '/reset-password' | null>(null);
   const handled = useRef<string | null>(null);
+  const returnToSignInRequested = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  const [navigationError, setNavigationError] = useState<string | null>(null);
+
+  async function returnToSignIn() {
+    if (!session) {
+      router.replace('/sign-in');
+      return;
+    }
+    setLeaving(true);
+    setNavigationError(null);
+    returnToSignInRequested.current = true;
+    try {
+      const { error } = await authClient().signOut({ scope: 'local' });
+      if (error) throw error;
+    } catch {
+      returnToSignInRequested.current = false;
+      setNavigationError('Could not sign out. Please try again.');
+    } finally {
+      setLeaving(false);
+    }
+  }
   useEffect(() => {
     const url = Platform.OS === 'web' ? window.location.href : link;
-    if (!url || handled.current === url) return;
+    if (!url || handled.current === url || (Platform.OS === 'web' && handled.current)) return;
     handled.current = url;
     async function complete() {
       try {
@@ -23,7 +45,7 @@ export default function AuthCallback() {
         const values = new URLSearchParams(parsed.hash.slice(1));
         parsed.searchParams.forEach((value, key) => values.set(key, value));
         // Remove credentials from browser history even if the exchange fails.
-        if (Platform.OS === 'web') window.history.replaceState(null, '', '/auth-callback');
+        if (Platform.OS === 'web') window.history.replaceState(window.history.state, '', parsed.pathname);
         if (values.has('error') || values.has('error_code')) throw new Error('This link is invalid or has expired. Please request a new email.');
         const access_token = values.get('access_token'), refresh_token = values.get('refresh_token');
         const code = values.get('code');
@@ -38,10 +60,16 @@ export default function AuthCallback() {
       } catch (e) { setError(e instanceof Error ? e.message : 'Could not verify this link.'); }
     }
     void complete();
-  }, [link, router]);
+  }, [link]);
+  if (error && !session && !leaving && returnToSignInRequested.current) return <Redirect href="/sign-in" />;
   if (destination && session) return <Redirect href={destination} />;
-  return <AccountPage title={error ? 'Let’s try that again.' : 'Verifying your link.'} subtitle={error ? 'Request a fresh email and open its link.' : 'Your account will be ready in a moment.'}>
+  return <AccountPage title={error ? 'Let’s try that again.' : 'Verifying your link.'} subtitle={error ? undefined : 'Your account will be ready in a moment.'}>
     <Notice error text={error} />
-    {error && <><Action title="Request a password reset" onPress={() => router.replace('/forgot-password')} /><Action title="Continue" secondary onPress={() => router.replace('/')} /></>}
+    {error && <>
+      <Notice error text={navigationError} />
+      <Action title={session ? 'Sign out and return to sign in' : 'Back to sign in'} busy={leaving} onPress={() => void returnToSignIn()} />
+      {!session && <Action title="Enter a signup code" secondary onPress={() => router.replace('/verify-email')} />}
+      <Action title="Request a password reset" secondary onPress={() => router.replace('/forgot-password')} />
+    </>}
   </AccountPage>;
 }
