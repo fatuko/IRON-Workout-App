@@ -64,6 +64,50 @@ test('failed storage writes reject and roll back in-memory changes', async () =>
   assert.deepEqual(await repo.getWorkoutTemplates(), []);
 });
 
+test('the app restores workout drafts after refresh and history after signing back in', async (t) => {
+  const data = new Map();
+  const repositoryPath = require.resolve('../src/repositories/index.ts');
+  global.window = { localStorage: {
+    getItem: key => data.get(key) ?? null,
+    setItem: (key, value) => data.set(key, value),
+  } };
+  t.after(() => {
+    delete global.window;
+    delete require.cache[repositoryPath];
+  });
+
+  const initial = require(repositoryPath);
+  initial.setWorkoutUser('lifter-a');
+  const repo = initial.workoutRepository;
+  await repo.saveWorkoutTemplate({ id: 'push', name: 'Push', color: '#FF3D00', exercises: [
+    { id: 'bench', name: 'Bench', sets: '1', target: '8–12', unit: 'REPS', pr: 'NO PR YET' },
+  ] });
+  const split = await repo.getActiveSplit();
+  const scheduled = await repo.addWorkoutToSplit(split.id, 'push', 'MONDAY');
+  const draft = await repo.startWorkout(scheduled.days[0].id);
+  const benchSet = { id: 1, complete: true, weight: '100', reps: '8', seconds: '', rir: '2' };
+  await repo.saveWorkoutSet(draft.id, 'bench', benchSet);
+
+  delete require.cache[repositoryPath];
+  const refreshed = require(repositoryPath);
+  await assert.rejects(refreshed.workoutRepository.getWorkoutHistory(), /Sign in/);
+  refreshed.setWorkoutUser('lifter-a');
+  const restored = await loadWorkoutPage(refreshed.workoutRepository);
+  assert.equal(restored.kind, 'session');
+  assert.equal(restored.session.id, draft.id);
+  assert.deepEqual(restored.session.exercises[0].sets[0], benchSet);
+  const completed = await refreshed.workoutRepository.finishWorkout(draft.id);
+
+  refreshed.setWorkoutUser(null);
+  await assert.rejects(refreshed.workoutRepository.getWorkoutHistory(), /Sign in/);
+  refreshed.setWorkoutUser('lifter-b');
+  assert.deepEqual(await refreshed.workoutRepository.getWorkoutHistory(), []);
+  assert.equal(await refreshed.workoutRepository.getDraftWorkout(), null);
+  refreshed.setWorkoutUser('lifter-a');
+  assert.deepEqual(await refreshed.workoutRepository.getWorkoutHistory(), [completed]);
+  assert.equal(await refreshed.workoutRepository.getDraftWorkout(), null);
+});
+
 test('a scheduled empty workout starts after its edited template is saved', async () => {
   const data = new Map();
   const repo = createLocalWorkoutRepository('play-regression', { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value) });
