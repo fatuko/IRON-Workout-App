@@ -1,0 +1,1 @@
+alter table public.profiles rename column training_expierence to training_experience;
