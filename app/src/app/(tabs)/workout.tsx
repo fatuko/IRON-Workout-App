@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -17,8 +17,12 @@ import {
 
 import * as Haptics from 'expo-haptics';
 
+import { useAuth } from '@/auth/provider';
+import { restTimerSeconds } from '@/utils/rest-timer';
+import { ExerciseSelector } from '@/components/exercise-selector';
 import { colors, spacing, typography } from '@/constants/theme';
 import { workoutRepository } from '@/repositories';
+import { loadWorkoutPage, type WorkoutPage } from '@/utils/resolve-workout';
 import type { WorkoutExercise, WorkoutSession, WorkoutSet, WorkoutSetField } from '@/types/workout';
 
 
@@ -59,17 +63,24 @@ function hasPersonalRecord(exercise: WorkoutExercise) {
 
 export default function WorkoutScreen() {
   const router = useRouter();
+  const { session: account } = useAuth();
+  const restSeconds = restTimerSeconds(account?.user.user_metadata.rest_seconds);
   const { sessionId } = useLocalSearchParams<{ sessionId?: string }>();
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [restRemaining, setRestRemaining] = useState<number | null>(null);
   const [showOverview, setShowOverview] = useState(false);
-  const [showReview, setShowReview] = useState(false);
+  const [landing, setLanding] = useState<WorkoutPage | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const startingRef = useRef(false);
+  const savingRef = useRef(false);
   const [animatedSetKey, setAnimatedSetKey] = useState<string | null>(null);
   const [reviewDuration, setReviewDuration] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const loadedSessionId = useRef<string | null>(null);
   const checkScale = useRef(new Animated.Value(1)).current;
   const workoutStartedAt = useRef(Date.now());
 
@@ -80,14 +91,21 @@ export default function WorkoutScreen() {
   ).length;
   const personalRecordCount = exercises.filter(hasPersonalRecord).length;
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let active = true;
+    setLoading(true);
+    setLoadError(null);
 
     async function loadWorkout() {
       try {
-        let savedSession = typeof sessionId === 'string'
-          ? await workoutRepository.getWorkout(sessionId)
-          : await workoutRepository.getDraftWorkout();
+        const page = await loadWorkoutPage(workoutRepository, sessionId);
+        if (!active) return;
+        setLanding(page);
+        if (page.kind !== 'session') {
+          setSession(null); setExercises([]); setShowOverview(false);
+          return;
+        }
+        let savedSession = page.session;
 
         if (
           savedSession &&
@@ -97,18 +115,11 @@ export default function WorkoutScreen() {
           savedSession = await workoutRepository.startWorkout(savedSession.splitDayId);
         }
 
-        if (!savedSession) {
-          const split = await workoutRepository.getActiveSplit();
-          const nextDay = split?.days[split.nextDayIndex] ?? split?.days[0];
-          if (nextDay) savedSession = await workoutRepository.startWorkout(nextDay.id);
-        }
-
         if (!active) return;
-        if (!savedSession) {
-          setLoadError('No workout is ready to start.');
-          return;
+        if (loadedSessionId.current !== savedSession.id) {
+          setActiveIndex(0); setRestRemaining(null); setShowOverview(false); setReviewDuration(null);
+          loadedSessionId.current = savedSession.id;
         }
-
         setSession(savedSession);
         setExercises(savedSession.exercises);
         workoutStartedAt.current = new Date(savedSession.startedAt).getTime();
@@ -123,13 +134,13 @@ export default function WorkoutScreen() {
     return () => {
       active = false;
     };
-  }, [sessionId]);
+  }, [sessionId]));
 
   useEffect(() => {
     if (restRemaining === null || restRemaining <= 0) return;
     const timer = setInterval(() => {
       setRestRemaining((current) => {
-        if (current === null || current <= 1) return 0;
+        if (current === null || current <= 1) return null;
         return current - 1;
       });
     }, 1000);
@@ -198,7 +209,7 @@ export default function WorkoutScreen() {
       }).start(() => setAnimatedSetKey(null));
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       animateLayout();
-      setRestRemaining(exercise.restSeconds);
+      setRestRemaining(restSeconds);
     }
   }
 
@@ -255,60 +266,50 @@ export default function WorkoutScreen() {
     remove();
   }
 
-  function openCompletion() {
+  function openOverview() {
     animateLayout();
-    setReviewDuration((current) => (
-      current ?? Math.max(1, Math.floor((Date.now() - workoutStartedAt.current) / 1000))
+    setReviewDuration(() => (
+      Math.max(1, Math.floor((Date.now() - workoutStartedAt.current) / 1000))
     ));
     setRestRemaining(null);
-    setShowOverview(false);
-    setShowReview(true);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }
-
-  function advanceExercise() {
-    const hasIncompleteSets = exercise.sets.some((set) => !set.complete);
-    const advance = () => {
-      animateLayout();
-      setRestRemaining(null);
-      if (activeIndex === exercises.length - 1) openCompletion();
-      else setActiveIndex((index) => index + 1);
-    };
-
-    if (!hasIncompleteSets) {
-      advance();
-      return;
-    }
-
-    Alert.alert(
-      'Incomplete sets',
-      'You can continue and return to this exercise later from the overview.',
-      [
-        { text: 'Keep logging', style: 'cancel' },
-        { text: 'Continue', onPress: advance },
-      ],
-    );
+    setShowOverview(true);
   }
 
   function selectExercise(index: number) {
     animateLayout();
     setActiveIndex(index);
     setShowOverview(false);
-    setShowReview(false);
+
+  }
+
+  async function startPlannedWorkout() {
+    if (landing?.kind !== 'ready' || startingRef.current) return;
+    startingRef.current = true; setStarting(true); setLoadError(null);
+    try {
+      const started = await workoutRepository.startWorkout(landing.day.id);
+      setSession(started); setExercises(started.exercises); setActiveIndex(0);
+      setRestRemaining(null); setShowOverview(false); setReviewDuration(null);
+      loadedSessionId.current = started.id;
+      workoutStartedAt.current = new Date(started.startedAt).getTime();
+      setLanding({ kind: 'session', session: started });
+      router.setParams({ sessionId: started.id });
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Could not start workout. Please try again.');
+    } finally { startingRef.current = false; setStarting(false); }
   }
 
   async function saveWorkout() {
-    if (!session) return;
-
+    if (!session || savingRef.current) return;
+    savingRef.current = true; setSaving(true);
     try {
-      const completed = await workoutRepository.finishWorkout(session.id);
-      setSession(completed);
-      Alert.alert('Workout saved', completed.workoutName + ' complete.', [
-        { text: 'Done', onPress: () => router.replace('/') },
-      ]);
+      await workoutRepository.finishWorkout(session.id);
+      const page = await loadWorkoutPage(workoutRepository);
+      setLanding(page); setSession(null); setExercises([]);
+      setShowOverview(false); setRestRemaining(null);
+      router.setParams({ sessionId: undefined });
     } catch {
       Alert.alert('Could not save workout', 'Please try again.');
-    }
+    } finally { savingRef.current = false; setSaving(false); }
   }
 
   if (loading) {
@@ -319,20 +320,48 @@ export default function WorkoutScreen() {
     );
   }
 
+  if (landing && landing.kind !== 'session') {
+    const ready = landing.kind === 'ready' ? landing.day : null;
+    return (
+      <ScrollView style={styles.screen} contentContainerStyle={styles.page}>
+        <Text style={styles.eyebrow}>TODAY’S WORKOUT</Text>
+        <Text style={styles.screenTitle}>{ready ? ready.name : landing.kind === 'done' ? 'Today’s workout is done.' : 'No planned workout today.'}</Text>
+        <Text style={styles.completionMessage}>{ready
+          ? `${ready.exercises.length} exercises · ${ready.exercises.reduce((total, item) => total + (Number(item.sets) || 0), 0)} sets`
+          : 'Feel free to start another workout.'}</Text>
+        {ready && <View style={styles.overviewList}>{ready.exercises.map((item, index) => (
+          <View key={item.id} style={styles.overviewRow}>
+            <Text style={styles.overviewNumberText}>{index + 1}</Text>
+            <View style={styles.overviewInfo}><Text style={styles.overviewName}>{item.name}</Text>
+              <Text style={styles.pendingStatus}>{item.sets} sets · {item.target} {item.unit.toLowerCase()}</Text></View>
+          </View>
+        ))}</View>}
+        {loadError && <Text accessibilityRole="alert" style={styles.errorText}>{loadError}</Text>}
+        {ready && <Pressable accessibilityRole="button" disabled={starting} onPress={() => void startPlannedWorkout()} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>{starting ? 'STARTING…' : 'START WORKOUT'}</Text>
+        </Pressable>}
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/splits')} style={ready ? styles.textButton : styles.primaryButton}>
+          <Text style={ready ? styles.textButtonLabel : styles.primaryButtonText}>{ready ? 'CHOOSE ANOTHER WORKOUT' : 'START ANOTHER WORKOUT'}</Text>
+        </Pressable>
+      </ScrollView>
+    );
+  }
+
   if (loadError || !session || !exercise) {
     return (
       <View style={styles.centerState}>
         <Text style={styles.errorText}>{loadError ?? 'No workout exercises found.'}</Text>
+        <Pressable onPress={() => router.replace('/splits')} style={styles.textButton}><Text style={styles.textButtonLabel}>BACK TO SPLITS</Text></Pressable>
       </View>
     );
   }
 
-  if (showReview) {
+  if (showOverview) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.page}>
-        <Text style={styles.eyebrow}>WORKOUT COMPLETE</Text>
+        <Text style={styles.eyebrow}>WORKOUT OVERVIEW</Text>
         <Text style={styles.screenTitle}>{session.workoutName}</Text>
-        <Text style={styles.completionMessage}>{session.workoutName} complete.</Text>
+        <Text style={styles.completionMessage}>{completedExerciseCount} of {exercises.length} exercises complete.</Text>
 
         <View style={styles.completionStats}>
           <View style={styles.completionStat}>
@@ -371,51 +400,11 @@ export default function WorkoutScreen() {
           })}
         </View>
 
-        <Pressable onPress={saveWorkout} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>SAVE WORKOUT</Text>
+        <Pressable accessibilityRole="button" disabled={saving} onPress={saveWorkout} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>{saving ? 'SAVING…' : 'FINISH & SAVE WORKOUT'}</Text>
         </Pressable>
-        <Pressable onPress={() => setShowReview(false)} style={styles.textButton}>
+        <Pressable onPress={() => setShowOverview(false)} style={styles.textButton}>
           <Text style={styles.textButtonLabel}>BACK TO WORKOUT</Text>
-        </Pressable>
-      </ScrollView>
-    );
-  }
-
-  if (showOverview) {
-    return (
-      <ScrollView style={styles.screen} contentContainerStyle={styles.page}>
-        <View style={styles.topBar}>
-          <View>
-            <Text style={styles.screenTitle}>{session.workoutName}</Text>
-          </View>
-          <Pressable onPress={() => setShowOverview(false)} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>CLOSE</Text>
-          </Pressable>
-        </View>
-        <View style={styles.overviewList}>
-          {exercises.map((item, index) => {
-            const status = getExerciseStatus(item);
-            return (
-              <Pressable
-                key={item.id}
-                onPress={() => selectExercise(index)}
-                style={[styles.overviewRow, index === activeIndex && styles.overviewRowActive]}>
-                <View style={styles.overviewNumber}>
-                  <Text style={styles.overviewNumberText}>{index + 1}</Text>
-                </View>
-                <View style={styles.overviewInfo}>
-                  <Text style={styles.overviewName}>{item.name}</Text>
-                </View>
-                <Text style={status === 'COMPLETED' ? styles.doneStatus : styles.pendingStatus}>
-                  {status}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Pressable onPress={openCompletion} style={styles.outlineButton}>
-          <Text style={styles.outlineButtonText}>FINISH WORKOUT</Text>
         </Pressable>
       </ScrollView>
     );
@@ -428,24 +417,14 @@ export default function WorkoutScreen() {
       showsVerticalScrollIndicator={false}
       style={styles.screen}
       contentContainerStyle={styles.page}>
-      <View style={styles.topBar}>
-        <View>
-          <Text style={styles.screenTitle}>{session.workoutName}</Text>
-          <Text style={styles.progressText}>EXERCISE {activeIndex + 1} OF {exercises.length}</Text>
-        </View>
-        <Pressable onPress={() => { animateLayout(); setShowOverview(true); }} style={styles.overviewButton}>
-          <Text style={styles.overviewButtonText}>OVERVIEW</Text>
-        </Pressable>
-      </View>
-
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${((activeIndex + 1) / exercises.length) * 100}%` }]} />
       </View>
 
       {restRemaining !== null && (
-        <View style={[styles.timerCard, restRemaining === 0 && styles.timerFinished]}>
+        <View style={styles.timerCard}>
           <View>
-            <Text style={styles.timerLabel}>{restRemaining === 0 ? 'REST COMPLETE' : 'REST TIMER'}</Text>
+            <Text style={styles.timerLabel}>REST TIMER</Text>
             <Text style={styles.timerValue}>{formatTimer(restRemaining)}</Text>
           </View>
           <View style={styles.timerActions}>
@@ -463,9 +442,12 @@ export default function WorkoutScreen() {
         <Text style={styles.exerciseName}>{exercise.name}</Text>
         <View style={styles.exerciseMetaRow}>
           <Text style={styles.repRange}>{exercise.sets.length} SETS · {exercise.repRange.toUpperCase()}</Text>
-          <Text style={styles.restDefault}>REST {formatTimer(exercise.restSeconds)}</Text>
+          <Text style={styles.restDefault}>REST {formatTimer(restSeconds)}</Text>
         </View>
-        <Text style={styles.lastPerformance}>{exercise.lastPerformance}</Text>
+        {exercise.lastPerformance?.trim() &&
+          !/^(no previous performance|no pr yet|previous best:\s*(no pr yet)?)$/i.test(exercise.lastPerformance.trim()) && (
+            <Text style={styles.lastPerformance}>{exercise.lastPerformance}</Text>
+          )}
       </View>
 
       <View style={styles.setTable}>
@@ -486,10 +468,11 @@ export default function WorkoutScreen() {
 
         {exercise.sets.map((set, index) => {
           const previousSet = exercise.previousSets?.[index];
+          const isCurrentSet = !set.complete && exercise.sets.find(item => !item.complete)?.id === set.id;
           return (
           <View key={set.id} style={styles.setGroup}>
             <View style={[styles.setRow, set.complete && styles.setRowComplete]}>
-            <Text style={[styles.setNumber, styles.setColumn]}>{String(index + 1).padStart(2, '0')}</Text>
+            <Text accessibilityLabel={'Set ' + (index + 1) + (isCurrentSet ? ', current set' : '')} style={[styles.setNumber, styles.setColumn, isCurrentSet && { color: colors.accent, fontSize: 24 }]}>{isCurrentSet ? '•' : index + 1}</Text>
             {isTimedExercise ? (
               <TextInput
                 accessibilityLabel={'Set ' + (index + 1) + ' seconds'}
@@ -541,7 +524,7 @@ export default function WorkoutScreen() {
                 accessibilityLabel={'Complete set ' + (index + 1)}
                 onPress={() => toggleSet(set.id)}
                 style={[styles.checkButton, set.complete && styles.checkButtonComplete]}>
-                <Text style={styles.checkButtonText}>{set.complete ? '✓' : ''}</Text>
+                <Text style={[styles.checkButtonText, !set.complete && { color: colors.textMuted }]}>✓</Text>
               </Pressable>
             </Animated.View>
             <Pressable
@@ -564,22 +547,14 @@ export default function WorkoutScreen() {
         <Text style={styles.addSetText}>＋ ADD SET</Text>
       </Pressable>
 
-      <View style={styles.navigationRow}>
-        <Pressable
-          disabled={activeIndex === 0}
-          onPress={() => {
-            animateLayout();
-            setRestRemaining(null);
-            setActiveIndex((index) => Math.max(0, index - 1));
-          }}
-          style={[styles.previousButton, activeIndex === 0 && styles.disabled]}>
-          <Text style={styles.previousText}>← PREVIOUS</Text>
-        </Pressable>
-        <Pressable onPress={advanceExercise} style={styles.nextButton}>
-          <Text style={styles.nextText}>
-            {activeIndex === exercises.length - 1 ? 'REVIEW WORKOUT' : 'DONE · NEXT →'}
-          </Text>
-        </Pressable>
+      <View style={styles.exerciseDock}>
+        <View style={styles.dockHeading}>
+          <View accessibilityLabel={'Exercise ' + (activeIndex + 1) + ' of ' + exercises.length} style={styles.progressBadge}><Text style={styles.badgeText}>{activeIndex + 1}/{exercises.length}</Text></View>
+          <View style={{ flex: 1 }}><Text numberOfLines={1} style={styles.dockTitle}>{exercise.name}</Text><Text numberOfLines={1} style={styles.dockCaption}>{session.workoutName}</Text></View>
+          <Pressable accessibilityRole="button" onPress={openOverview} style={styles.reviewButton}><Text style={styles.reviewText}>Overview</Text></Pressable>
+        </View>
+        <ExerciseSelector exercises={exercises} selected={activeIndex}
+          onSelect={index => { setRestRemaining(null); selectExercise(index); }} />
       </View>
 
     </ScrollView>
@@ -587,6 +562,20 @@ export default function WorkoutScreen() {
 }
 
 const styles = StyleSheet.create({
+  exerciseDock: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 20, gap: 16 },
+  dockHeading: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  progressBadge: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: colors.accent, justifyContent: 'center', alignItems: 'center' },
+  badgeText: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  dockTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  dockCaption: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
+  exerciseChips: { gap: 10, paddingVertical: 2 },
+  exerciseChip: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  exerciseChipActive: { backgroundColor: colors.checked, borderWidth: 1, borderColor: '#555555' },
+  chipText: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  reviewButton: { padding: 12, backgroundColor: colors.accentDark, borderRadius: 24 },
+  reviewText: { color: colors.accent, fontWeight: '700', fontSize: 13 },
+
+
   screen: { flex: 1, backgroundColor: colors.background },
   centerState: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   errorText: { color: colors.textMuted, fontSize: 13, textAlign: 'center' },
@@ -638,7 +627,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 16,
   },
-  timerFinished: { backgroundColor: colors.surface },
   timerLabel: { color: colors.accent, fontSize: 9, fontWeight: '700', letterSpacing: 2 },
   timerValue: { color: colors.text, fontSize: 28, fontWeight: '900', marginTop: 2 },
   timerActions: { flexDirection: 'row', gap: spacing.sm },
@@ -679,7 +667,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   setColumn: { flex: 0, width: 28 },
-  doneColumn: { width: 42 },
+  doneColumn: { width: 44 },
   removeColumn: { width: 28 },
   setGroup: { gap: 6 },
   setRow: {
@@ -707,16 +695,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     borderRadius: 10,
   },
-  checkButton: {
-    width: 42,
-    height: 42,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-  },
-  checkButtonComplete: { backgroundColor: colors.accent, borderColor: colors.accent },
+  checkButton: { width: 44, height: 44, backgroundColor: colors.checked, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
+  checkButtonComplete: { backgroundColor: '#219B55' },
   checkButtonText: { color: colors.text, fontSize: 17, fontWeight: '900' },
   removeSetButton: { width: 28, height: 42, alignItems: 'center', justifyContent: 'center' },
   removeSetText: { color: colors.textMuted, fontSize: 20, fontWeight: '500' },
