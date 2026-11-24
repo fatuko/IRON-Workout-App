@@ -107,13 +107,13 @@ function PillTabBar({ state, descriptors, emitter, navigateToTab, insets }: Pill
 }
 
 export default function RootLayout() {
-  const { session, guest } = useAuth();
-  if (!session && !guest) return <Redirect href="/sign-in" />;
+  const { session } = useAuth();
+  if (!session) return <Redirect href="/sign-in" />;
   return (
     <>
       <StatusBar style="light" />
       <Tabs
-        key={session?.user.id ?? 'device-guest'}
+        key={session.user.id}
         tabBar={(props) => <PillTabBar {...props} />}
         screenOptions={{
           headerShown: false,

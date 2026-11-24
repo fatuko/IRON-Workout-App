@@ -10,19 +10,15 @@ import { colors } from '@/constants/theme';
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function Routes() {
-  const { session, loading, guest } = useAuth();
+  const { session, loading } = useAuth();
   const [introComplete, setIntroComplete] = useState(false);
   const finishIntro = useCallback(() => setIntroComplete(true), []);
   if (!introComplete || loading) return <LaunchScreen ready={!loading} onComplete={finishIntro} />;
   return <View style={{ flex: 1 }}><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-    <Stack.Protected guard={!session && !guest}>
+    <Stack.Protected guard={!session}>
       <Stack.Screen name="sign-in" /><Stack.Screen name="sign-up" /><Stack.Screen name="verify-email" />
-    </Stack.Protected>
-    <Stack.Protected guard={!!session || guest}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="onboarding" />
-    </Stack.Protected>
-    <Stack.Protected guard={!!session}>
       <Stack.Screen name="account-settings" />
       <Stack.Screen name="reset-password" />
     </Stack.Protected>

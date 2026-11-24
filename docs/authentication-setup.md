@@ -1,12 +1,8 @@
 # Account setup and verification
 
-Supabase is currently paused (reported by the project team). Live sign-in, signup, email verification, and account updates remain unverified until the project is resumed. Guest mode supports local workout development in the meantime.
+The project team restored the hosted Supabase project. Live sign-in, signup, email verification, and account updates still need verification.
 
-The app uses Supabase Auth for email/password accounts. First/last name and the rest-timer preference live in user metadata; the join date comes from `user.created_at`. Metadata is not an authorization mechanism.
-
-## Guest access
-
-Continue as guest opens Home without creating a Supabase session. Guest workouts persist locally in a separate device-guest store and do not merge into signed-in accounts. Profile offers a return to sign-in; account settings remain sign-in-only.
+The app requires a Supabase session to access workouts and uses email/password accounts. First/last name and the rest-timer preference live in user metadata; the join date comes from `user.created_at`. Metadata is not an authorization mechanism.
 
 ## Local configuration
 

@@ -7,7 +7,7 @@ import { validateEmail } from '@/auth/validation';
 
 export default function SignIn() {
   const router = useRouter();
-  const { error: sessionError, enterGuest } = useAuth();
+  const { error: sessionError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -35,6 +35,5 @@ export default function SignIn() {
     <Action title="Sign in" busy={busy} disabled={!supabase} onPress={() => void submit()} />
     <Action title="Forgot password?" secondary onPress={() => router.push('/forgot-password')} />
     <Action title="New to IRON? Create an account" secondary onPress={() => router.push('/sign-up')} />
-    <Action title="Continue as guest" secondary disabled={busy} onPress={enterGuest} />
   </AccountPage>;
 }
